@@ -1,0 +1,201 @@
+.topology-edge.edge-unmatched {
+  stroke: #f2b8b8;
+  stroke-dasharray: 4 4;
+}
+
+.topology-edge.edge-flowing {
+  stroke-dasharray: 9 7;
+  animation: edge-dash-flow 0.8s linear 2;
+}
+
+@keyframes edge-dash-flow {
+  from {
+    stroke-dashoffset: 32;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.topology-node.node-pulse {
+  border-color: var(--accent, var(--color-primary));
+  animation: node-ring-pulse 0.7s var(--ease-standard);
+}
+
+@keyframes node-ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, var(--color-primary)) 45%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent, var(--color-primary)) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent, var(--color-primary)) 0%, transparent);
+  }
+}
+
+.topology-node.node-queue.matched {
+  animation: node-ring-pulse-success 0.7s var(--ease-standard);
+}
+
+@keyframes node-ring-pulse-success {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-success) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px var(--color-success-soft);
+  }
+}
+
+.topology-node.node-consumer.node-acked {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  animation: node-pop 0.4s var(--ease-spring);
+}
+
+@keyframes node-pop {
+  0% {
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.packet-dot {
+  fill: var(--accent, var(--color-primary));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent, var(--color-primary)) 65%, transparent));
+  offset-rotate: 0deg;
+  animation: packet-travel 0.85s var(--ease-standard) forwards;
+}
+
+.packet-dot.packet-ack {
+  fill: var(--color-success);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 65%, transparent));
+}
+
+@keyframes packet-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  88% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+/* Una cola que no matchea nunca recibe nada del exchange: nada debe
+   "viajar" por la línea. El único aviso es un pequeño destello que queda
+   pegado al borde del exchange (offset-distance fijo, sin animar la
+   posición) — el exchange evalúa el binding y lo descarta ahí mismo. */
+.packet-dot.packet-reject {
+  fill: var(--color-danger);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-danger) 60%, transparent));
+  offset-distance: 5%;
+  animation: reject-blip 0.5s var(--ease-standard) forwards;
+}
+
+@keyframes reject-blip {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
+/* Aro rojo que destella sobre la cola cuando un mensaje no matchea.
+   Es un elemento hermano (no hijo) del nodo de la cola, posicionado con
+   las mismas coordenadas, para que no herede el opacity atenuado del
+   nodo "unmatched" y se vea con el rojo bien vivo. */
+.node-reject-flash {
+  position: absolute;
+  border-radius: var(--radius-md);
+  border: 2px solid var(--color-danger);
+  opacity: 0;
+  pointer-events: none;
+  animation: node-reject-pulse 0.6s var(--ease-standard);
+}
+
+@keyframes node-reject-pulse {
+  0% {
+    opacity: 0;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 40%, transparent);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-danger) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .packet-dot,
+  .node-reject-flash {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ---------- Binding puente (Exchange <-> Exchange) ---------- */
+
+.topology-edge.edge-bridge {
+  stroke: var(--color-bridge);
+  stroke-width: 2.5;
+  stroke-dasharray: 6 5;
+  opacity: 0.55;
+}
+
+.topology-edge.edge-bridge.edge-flowing {
+  opacity: 1;
+  stroke-dasharray: 10 6;
+}
+
+.packet-dot.packet-bridge {
+  fill: var(--color-bridge);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-bridge) 65%, transparent));
+}
+
+.bridge-label {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-bridge-soft);
+  color: var(--color-bridge);
+  border: 1px solid color-mix(in srgb, var(--color-bridge) 35%, transparent);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  animation: rise-in 0.4s var(--ease-standard) both;
+}

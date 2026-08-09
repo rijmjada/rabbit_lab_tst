@@ -1,0 +1,24 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: rabbitmq-playground
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-returns: true
+    publisher-confirm-type: correlated
+
+app:
+  cors:
+    allowed-origin: ${APP_CORS_ORIGIN:http://localhost:5173}
+  scenario:
+    idle-timeout-minutes: ${APP_SCENARIO_IDLE_MINUTES:30}
+    cleanup-interval-ms: ${APP_SCENARIO_CLEANUP_MS:300000}
+
+logging:
+  level:
+    com.ayigroup.rabbitmq.playground: INFO

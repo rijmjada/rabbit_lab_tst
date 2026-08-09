@@ -1,0 +1,52 @@
+# Este repo tiene subproyectos con su propio .gitignore (frontend/, backend/);
+# este archivo cubre lo que queda a nivel raíz para que un `git add -A` desde
+# la raíz no arrastre nada generado, de IDE, de sistema operativo o sensible.
+
+# ---------- Logs (generados por start.ps1 en logs/backend.log, logs/frontend.log) ----------
+logs/
+*.log
+
+# ---------- Node / Vite (por si se corre algo desde la raíz) ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- Java / Maven ----------
+target/
+*.class
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+hs_err_pid*.log
+replay_pid*.log
+
+# ---------- Variables de entorno / secretos ----------
+.env
+.env.*
+!.env.example
+
+# ---------- IDEs y editores ----------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.classpath
+.project
+.settings/
+nbproject/
+nb-configuration.xml
+*.swp
+*~
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ---------- Claude Code: solo se ignora la config local, no compartida ----------
+.claude/settings.local.json

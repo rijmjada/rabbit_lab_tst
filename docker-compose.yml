@@ -1,0 +1,15 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq-playground-broker
+    ports:
+      - "5672:5672"   # protocolo AMQP (lo usa el backend)
+      - "15672:15672" # UI de management, opcional, solo para inspeccionar
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

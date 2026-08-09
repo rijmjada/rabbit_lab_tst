@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx oxlint *)",
+      "Bash(command -v chromium-cli)",
+      "Bash(command -v npx)",
+      "Bash(npx --version)",
+      "Bash(npm ls *)",
+      "Bash(pip show *)",
+      "Read(//c//**)",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(netstat -ano)",
+      "Bash(powershell -NoProfile -Command \"Stop-Process -Id 8008 -Force\")",
+      "Bash(mvn -q -DskipTests compile)",
+      "Bash(mvn -DskipTests compile)"
+    ]
+  }
+}
