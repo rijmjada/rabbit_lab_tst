@@ -50,12 +50,14 @@ export function HomeScreen() {
   return (
     <div>
       <div className="page-header">
-        <h1>RabbitMQ Playground</h1>
-        <p>
-          Una herramienta visual para experimentar con los tipos de Exchange de RabbitMQ y cómo se combinan entre
-          sí. Cada sección declara una topología real en un broker de RabbitMQ, y te deja enviar mensajes y ver en
-          vivo cómo se enrutan, se entregan y se confirman.
-        </p>
+        <div className="page-header-text">
+          <h1>RabbitMQ Playground</h1>
+          <p>
+            Una herramienta visual para experimentar con los tipos de Exchange de RabbitMQ y cómo se combinan entre
+            sí. Cada sección declara una topología real en un broker de RabbitMQ, y te deja enviar mensajes y ver en
+            vivo cómo se enrutan, se entregan y se confirman.
+          </p>
+        </div>
       </div>
       <div className="home-grid">
         {SECTIONS.map((s) => (
