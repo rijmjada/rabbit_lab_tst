@@ -12,7 +12,40 @@ Este proyecto es la implementación de la propuesta de arquitectura acordada pre
 
 ## Cómo correrlo
 
-### 1. Levantar RabbitMQ
+### Opción rápida: un solo script (Windows / PowerShell)
+
+```powershell
+.\start.ps1
+```
+
+Levanta todo en el orden correcto — RabbitMQ (Docker), backend y frontend — esperando a que cada pieza esté lista antes de seguir con la siguiente. Backend y frontend corren **ocultos en segundo plano** (no abre ventanas nuevas), con su salida redirigida a `logs/backend.log` y `logs/frontend.log`; para seguirlos en vivo:
+
+```powershell
+Get-Content logs\backend.log -Wait
+Get-Content logs\frontend.log -Wait
+```
+
+Si algún puerto ya estaba en uso (por ejemplo porque dejaste el backend corriendo de una vez anterior), el script lo detecta y no lo vuelve a levantar. Al terminar abre `http://localhost:5173` automáticamente.
+
+Para detener todo (contenedor de RabbitMQ + procesos de backend/frontend):
+
+```powershell
+.\start.ps1 -Stop
+```
+
+Si PowerShell bloquea el script por la policy de ejecución de tu máquina:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+Requiere Docker Desktop corriendo, Java 21 y Node 18+ instalados.
+
+### Opción manual, paso a paso
+
+Si preferís levantar cada pieza a mano (por ejemplo, para ver los logs de cada una en su propia consola):
+
+#### 1. Levantar RabbitMQ
 
 ```bash
 docker compose up -d
@@ -22,7 +55,7 @@ Esto expone RabbitMQ en `localhost:5672` (AMQP) y `localhost:15672` (UI de manag
 
 Si no tenés Docker a mano, cualquier RabbitMQ local con el usuario `guest`/`guest` en el puerto `5672` sirve — no hace falta crear nada manualmente, la app declara toda su propia infraestructura.
 
-### 2. Levantar el backend
+#### 2. Levantar el backend
 
 ```bash
 cd backend
@@ -31,7 +64,7 @@ mvn spring-boot:run
 
 Queda escuchando en `http://localhost:8080`. Variables de entorno opcionales (todas con default razonable): `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `APP_CORS_ORIGIN`.
 
-### 3. Levantar el frontend
+#### 3. Levantar el frontend
 
 ```bash
 cd frontend
