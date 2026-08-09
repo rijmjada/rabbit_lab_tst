@@ -9,25 +9,29 @@ import { ExplanationPanel } from "../../components/explain/ExplanationPanel";
 import { MessageComposer } from "../../components/messaging/MessageComposer";
 import { MessageHistoryList } from "../../components/messaging/MessageHistoryList";
 import { BindingEditor } from "../../components/binding/BindingEditor";
+import { MODULE_ACCENTS } from "../../lib/moduleColors";
 
 export function ExchangeToExchangeScreen() {
   const { scenario, loading, error, create, reset, remove, updateBindings, resetSignal } =
     useScenario("EXCHANGE_TO_EXCHANGE");
   const queues = useMemo(() => scenario?.queues ?? [], [scenario]);
   const { producerTick, primaryExchangeTick, secondaryExchangeTick, bridgeTick, primaryQueueStates, secondaryQueueStates } =
-    useExchangeBridgeAnimation(scenario?.id, queues);
+    useExchangeBridgeAnimation(scenario?.id, queues, resetSignal);
   const records = useMessageHistory(scenario?.id, resetSignal);
 
   const bindingByName = useMemo(() => new Map(queues.map((q) => [q.name, q.pattern ?? ""])), [queues]);
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Exchange → Exchange</h1>
-        <p>
-          Un exchange puede estar bindeado a otro exchange, no solo a colas: los mensajes que matchean ese binding se
-          reenvían, intactos, al segundo exchange.
-        </p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.bridge } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Exchange → Exchange</h1>
+          <p>
+            Un exchange puede estar bindeado a otro exchange, no solo a colas: los mensajes que matchean ese binding
+            se reenvían, intactos, al segundo exchange.
+          </p>
+        </div>
+        <span className="page-header-badge">Puente</span>
       </div>
 
       <ExplanationPanel>

@@ -18,9 +18,12 @@ export function FanoutScreen() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Fanout Exchange</h1>
-        <p>El difusor: entrega una copia del mensaje a todas las colas vinculadas, sin mirar la routing key.</p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.fanout } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Fanout Exchange</h1>
+          <p>El difusor: entrega una copia del mensaje a todas las colas vinculadas, sin mirar la routing key.</p>
+        </div>
+        <span className="page-header-badge">Fanout</span>
       </div>
 
       <ExplanationPanel>

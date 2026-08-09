@@ -21,9 +21,12 @@ export function TopicScreen() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Topic Exchange</h1>
-        <p>El enrutador por patrones: compara la Routing Key contra patrones jerárquicos con comodines.</p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.topic } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Topic Exchange</h1>
+          <p>El enrutador por patrones: compara la Routing Key contra patrones jerárquicos con comodines.</p>
+        </div>
+        <span className="page-header-badge">Topic</span>
       </div>
 
       <ExplanationPanel>

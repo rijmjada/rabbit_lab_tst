@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useScenarioSocket } from "./useScenarioSocket";
 import type { QueueVisualState } from "./useTopologyAnimation";
 import type { BoundExchange, MessageEventDto, QueueConfig, RoutingDecision } from "../types";
@@ -21,7 +21,11 @@ const BRIDGE_TRAVEL_MS = 750;
  * en vez de compartir el reducer con useTopologyAnimation a propósito,
  * para no acoplar esta pantalla nueva a la lógica de las otras 5.
  */
-export function useExchangeBridgeAnimation(scenarioId: string | undefined, queues: QueueConfig[]) {
+export function useExchangeBridgeAnimation(
+  scenarioId: string | undefined,
+  queues: QueueConfig[],
+  resetSignal?: number,
+) {
   const [producerTick, setProducerTick] = useState(0);
   const [primaryExchangeTick, setPrimaryExchangeTick] = useState(0);
   const [secondaryExchangeTick, setSecondaryExchangeTick] = useState(0);
@@ -34,6 +38,21 @@ export function useExchangeBridgeAnimation(scenarioId: string | undefined, queue
   // Exchange 2 fue directo o llegó cruzando el puente desde Exchange 1
   // (ROUTING_EVALUATED no repite ese dato, solo MESSAGE_PUBLISHED).
   const enteredExchangeByMessage = useRef(new Map<string, BoundExchange>());
+
+  // "Reiniciar" vacía las colas en el backend sin emitir ningún evento de
+  // WebSocket (mismo caso que useTopologyAnimation), así que sin esto el
+  // diagrama se queda congelado mostrando el resultado del último mensaje
+  // (contadores, colas en verde, "ACK ✓") para siempre.
+  useEffect(() => {
+    if (!resetSignal) return;
+    setProducerTick(0);
+    setPrimaryExchangeTick(0);
+    setSecondaryExchangeTick(0);
+    setBridgeTick(0);
+    setUnroutedTick(0);
+    setQueueStates({});
+    enteredExchangeByMessage.current.clear();
+  }, [resetSignal]);
 
   const applyDecisions = useCallback((decisions: RoutingDecision[]) => {
     if (decisions.length === 0) return;

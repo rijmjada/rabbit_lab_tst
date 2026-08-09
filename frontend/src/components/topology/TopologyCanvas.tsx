@@ -14,7 +14,7 @@ interface TopologyCanvasProps {
   accentColor?: string;
 }
 
-const WIDTH = 1050;
+const WIDTH = 1090;
 // Las colas son las que más texto variable cargan (nombre + resumen de
 // bindings, que puede tener varias cabeceras): les damos una fila alta y
 // ancha para que casi nunca necesiten más de las 2-3 líneas para las que
@@ -26,15 +26,15 @@ const TOP_PADDING = 20;
 function layout(count: number) {
   const height = Math.max(count * ROW_HEIGHT + TOP_PADDING, 300);
   const centerY = height / 2;
-  const producer = { x: 16, y: centerY - 28, w: 150, h: 56 };
-  const exchange = { x: 190, y: centerY - 42, w: 300, h: 84 };
+  const producer = { x: 16, y: centerY - 34, w: 175, h: 68 };
+  const exchange = { x: 220, y: centerY - 42, w: 300, h: 84 };
   const queues = Array.from({ length: count }, (_, i) => ({
     x: 575,
     y: TOP_PADDING + i * ROW_HEIGHT,
     w: 250,
     h: 115,
   }));
-  const consumers = queues.map((q) => ({ x: 870, y: q.y + 21, w: 160, h: 72 }));
+  const consumers = queues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
   return { height, producer, exchange, queues, consumers };
 }
 
@@ -155,6 +155,7 @@ export function TopologyCanvas({
       >
         <div className="node-kind">Producer</div>
         <div className="node-label">{producerLabel}</div>
+        <div className="node-sub node-producer-sub">basic_publish()</div>
       </div>
 
       <div
@@ -178,7 +179,10 @@ export function TopologyCanvas({
               className={`topology-node node-queue ${stateClass} ${ackedClass}`.trim()}
               style={{ ...box(qp, height), animationDelay: `${0.1 + i * 0.06}s` }}
             >
-              <div className="node-kind">Cola</div>
+              <div className="node-queue-head">
+                <span className="node-kind">Cola</span>
+                <span className="node-counter">{q.ackTick}</span>
+              </div>
               <div className="node-label" title={q.label}>{q.label}</div>
               <div className="node-sub" title={sub}>{sub}</div>
             </div>
@@ -202,9 +206,12 @@ export function TopologyCanvas({
             className={"topology-node node-consumer" + (q.deliveryState === "acked" ? " node-acked" : "")}
             style={{ ...box(cp, height), animationDelay: `${0.15 + i * 0.06}s` }}
           >
-            <div className="node-kind">Consumer</div>
-            <div className="node-label">
-              {q.deliveryState === "acked" ? "ACK ✓" : q.deliveryState === "delivered" ? "Procesando…" : "En espera"}
+            <span className="node-consumer-dot" />
+            <div className="node-consumer-text">
+              <div className="node-kind">Consumer</div>
+              <div className="node-label">
+                {q.deliveryState === "acked" ? "ACK ✓" : q.deliveryState === "delivered" ? "Procesando…" : "En espera"}
+              </div>
             </div>
           </div>
         );

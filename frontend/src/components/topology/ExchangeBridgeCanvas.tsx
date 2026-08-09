@@ -23,7 +23,7 @@ interface ExchangeBridgeCanvasProps {
   bridgeTick: number;
 }
 
-const WIDTH = 1050;
+const WIDTH = 1090;
 const ROW_HEIGHT = 150;
 const TOP_PADDING = 20;
 // Espacio entre las dos "bandas" (Exchange 1 arriba, Exchange 2 abajo)
@@ -44,9 +44,9 @@ function layout(primaryCount: number, secondaryCount: number) {
   const secondaryCenterY = secondaryTop + secondaryH / 2;
   const allCenterY = height / 2;
 
-  const producer = { x: 16, y: allCenterY - 28, w: 150, h: 56 };
-  const primaryExchange = { x: 190, y: primaryCenterY - 42, w: 300, h: 84 };
-  const secondaryExchange = { x: 190, y: secondaryCenterY - 42, w: 300, h: 84 };
+  const producer = { x: 16, y: allCenterY - 34, w: 175, h: 68 };
+  const primaryExchange = { x: 220, y: primaryCenterY - 42, w: 300, h: 84 };
+  const secondaryExchange = { x: 220, y: secondaryCenterY - 42, w: 300, h: 84 };
 
   const primaryQueues = Array.from({ length: primaryCount }, (_, i) => ({
     x: 575,
@@ -60,8 +60,8 @@ function layout(primaryCount: number, secondaryCount: number) {
     w: 250,
     h: 115,
   }));
-  const primaryConsumers = primaryQueues.map((q) => ({ x: 870, y: q.y + 21, w: 160, h: 72 }));
-  const secondaryConsumers = secondaryQueues.map((q) => ({ x: 870, y: q.y + 21, w: 160, h: 72 }));
+  const primaryConsumers = primaryQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
+  const secondaryConsumers = secondaryQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
 
   return {
     height,
@@ -186,7 +186,10 @@ function queueAndConsumerNodes(
               className={`topology-node node-queue ${stateClass} ${ackedClass}`.trim()}
               style={{ ...box(qp, height), animationDelay: `${delayBase + i * 0.06}s` }}
             >
-              <div className="node-kind">Cola</div>
+              <div className="node-queue-head">
+                <span className="node-kind">Cola</span>
+                <span className="node-counter">{q.ackTick}</span>
+              </div>
               <div className="node-label" title={q.label}>{q.label}</div>
               <div className="node-sub" title={sub}>{sub}</div>
             </div>
@@ -209,9 +212,12 @@ function queueAndConsumerNodes(
             className={"topology-node node-consumer" + (q.deliveryState === "acked" ? " node-acked" : "")}
             style={{ ...box(cp, height), animationDelay: `${delayBase + 0.05 + i * 0.06}s` }}
           >
-            <div className="node-kind">Consumer</div>
-            <div className="node-label">
-              {q.deliveryState === "acked" ? "ACK ✓" : q.deliveryState === "delivered" ? "Procesando…" : "En espera"}
+            <span className="node-consumer-dot" />
+            <div className="node-consumer-text">
+              <div className="node-kind">Consumer</div>
+              <div className="node-label">
+                {q.deliveryState === "acked" ? "ACK ✓" : q.deliveryState === "delivered" ? "Procesando…" : "En espera"}
+              </div>
             </div>
           </div>
         );
@@ -301,6 +307,7 @@ export function ExchangeBridgeCanvas({
       <div className={"topology-node node-producer" + (producerActive ? " node-pulse" : "")} style={box(producer, height)}>
         <div className="node-kind">Producer</div>
         <div className="node-label">{producerLabel}</div>
+        <div className="node-sub node-producer-sub">basic_publish()</div>
       </div>
 
       <div

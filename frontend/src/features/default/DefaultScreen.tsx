@@ -19,9 +19,12 @@ export function DefaultScreen() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Default Exchange</h1>
-        <p>El exchange sin nombre ("") que viene incluido en RabbitMQ: cada cola queda vinculada automáticamente a él usando su propio nombre.</p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.default } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Default Exchange</h1>
+          <p>El exchange sin nombre ("") que viene incluido en RabbitMQ: cada cola queda vinculada automáticamente a él usando su propio nombre.</p>
+        </div>
+        <span className="page-header-badge">Default</span>
       </div>
 
       <ExplanationPanel>

@@ -30,9 +30,12 @@ export function HeadersScreen() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Headers Exchange</h1>
-        <p>El enrutador por metadatos: compara cabeceras clave-valor del mensaje contra las que pide cada binding.</p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.headers } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Headers Exchange</h1>
+          <p>El enrutador por metadatos: compara cabeceras clave-valor del mensaje contra las que pide cada binding.</p>
+        </div>
+        <span className="page-header-badge">Headers</span>
       </div>
 
       <ExplanationPanel>

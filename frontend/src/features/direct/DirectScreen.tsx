@@ -21,9 +21,12 @@ export function DirectScreen() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Direct Exchange</h1>
-        <p>El cartero preciso: entrega el mensaje solo a las colas cuya Binding Key coincide exactamente con la Routing Key.</p>
+      <div className="page-header" style={{ "--accent": MODULE_ACCENTS.direct } as React.CSSProperties}>
+        <div className="page-header-text">
+          <h1>Direct Exchange</h1>
+          <p>El cartero preciso: entrega el mensaje solo a las colas cuya Binding Key coincide exactamente con la Routing Key.</p>
+        </div>
+        <span className="page-header-badge">Direct</span>
       </div>
 
       <ExplanationPanel>

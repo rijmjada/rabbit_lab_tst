@@ -51,6 +51,10 @@
   --module-topic: #7c3aed;
   --module-headers: #0d9488;
   --module-default: #475569;
+  /* El productor siempre usa este acento fijo (cyan), independiente del
+     módulo — así se distingue claramente de la caja del exchange, que sí
+     usa el color de identidad de cada módulo. */
+  --color-node-producer: #0891b2;
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -103,6 +107,7 @@
   --module-topic: #a78bfa;
   --module-headers: #2dd4bf;
   --module-default: #94a3b8;
+  --color-node-producer: #22d3ee;
 }
 
 * {
@@ -428,7 +433,7 @@ code, pre {
 .app-main {
   flex: 1;
   padding: 28px 36px 60px;
-  max-width: 1240px;
+  max-width: 1560px;
 }
 
 /* ---------- Cards & sections ---------- */
@@ -457,14 +462,22 @@ code, pre {
 }
 
 .page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 20px;
   animation: rise-in 0.4s var(--ease-standard) both;
+}
+
+.page-header-text {
+  min-width: 0;
 }
 
 .page-header h1 {
   font-size: 22px;
   margin-bottom: 6px;
-  background: linear-gradient(90deg, var(--color-text), var(--color-text) 60%, var(--color-primary-dark));
+  background: linear-gradient(90deg, var(--color-text), var(--color-text) 60%, var(--accent, var(--color-primary-dark)));
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -473,6 +486,20 @@ code, pre {
   color: var(--color-text-muted);
   font-size: 14px;
   max-width: 780px;
+}
+
+.page-header-badge {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--accent, var(--color-primary));
+  color: var(--accent, var(--color-primary));
+  background: color-mix(in srgb, var(--accent, var(--color-primary)) 12%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .explanation-panel {
@@ -498,7 +525,7 @@ code, pre {
 
 .layout-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
   gap: 20px;
   align-items: start;
 }
@@ -887,6 +914,11 @@ select:focus {
   width: 100%;
   min-height: 320px;
   overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+  background-image: radial-gradient(circle, var(--color-border-strong) 1.1px, transparent 1.1px);
+  background-size: 24px 24px;
+  transition: background-color 0.25s var(--ease-standard);
 }
 
 .topology-svg {
@@ -964,8 +996,16 @@ select:focus {
 }
 
 .topology-node.node-producer {
-  border-color: var(--color-border-strong);
-  background: var(--color-neutral-surface);
+  border-color: var(--color-node-producer);
+  background: color-mix(in srgb, var(--color-node-producer) 8%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-node-producer) 25%, transparent);
+}
+
+.topology-node .node-producer-sub {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 10.5px;
+  opacity: 0.8;
+  white-space: nowrap;
 }
 
 .topology-node.node-exchange {
@@ -975,6 +1015,59 @@ select:focus {
 
 .topology-node.node-exchange .node-label {
   font-size: 12px;
+}
+
+/* En la caja del exchange, "kind" (EXCHANGE) y "sub" (tipo/binding) se ven
+   como pills con el acento del módulo, en vez del texto plano de las demás
+   cajas — es la pieza más importante del diagrama, se destaca más. */
+.topology-node.node-exchange .node-kind {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, var(--color-primary)) 20%, var(--color-surface));
+  color: var(--accent, var(--color-primary));
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.topology-node.node-exchange .node-sub {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 45%, transparent);
+  color: var(--accent, var(--color-primary));
+  font-weight: 600;
+}
+
+.node-queue-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.node-counter {
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s var(--ease-standard), color 0.25s var(--ease-standard);
+}
+
+.topology-node.node-queue.matched .node-counter,
+.topology-node.node-queue.acked .node-counter {
+  background: var(--color-success-soft);
+  color: var(--color-success);
 }
 
 .topology-node.node-queue.matched {
@@ -992,8 +1085,34 @@ select:focus {
 }
 
 .topology-node.node-consumer {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   border-color: var(--color-border-strong);
   background: var(--color-neutral-surface);
+}
+
+.node-consumer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-text-muted);
+  transition: background 0.25s var(--ease-standard);
+}
+
+.topology-node.node-consumer.node-acked .node-consumer-dot {
+  background: var(--color-success);
+}
+
+.node-consumer-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.node-consumer-text .node-label {
+  white-space: nowrap;
 }
 
 .pulse-dot {
