@@ -83,11 +83,15 @@ export function useScenario(type: ExchangeType) {
     setError(null);
     try {
       await api.deleteScenario(scenario.id);
+      // Solo se limpia el estado local si el backend confirmó el borrado
+      // real de la infraestructura en RabbitMQ — si el DELETE falla, dejamos
+      // el escenario como estaba para que "Limpiar" no aparente haber
+      // funcionado cuando en realidad no se borró nada en el broker.
+      scenarioCache.delete(type);
+      setScenario(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      scenarioCache.delete(type);
-      setScenario(null);
       setLoading(false);
     }
   }, [scenario, type]);
