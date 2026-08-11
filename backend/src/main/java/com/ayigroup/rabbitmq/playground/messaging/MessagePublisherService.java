@@ -6,6 +6,7 @@ import com.ayigroup.rabbitmq.playground.events.EventBroadcaster;
 import com.ayigroup.rabbitmq.playground.events.MessageEventDto;
 import com.ayigroup.rabbitmq.playground.history.MessageHistoryService;
 import com.ayigroup.rabbitmq.playground.history.MessageRecord;
+import com.ayigroup.rabbitmq.playground.routing.AlternateExchangeRoutingEvaluator;
 import com.ayigroup.rabbitmq.playground.routing.ExchangeToExchangeRoutingEvaluator;
 import com.ayigroup.rabbitmq.playground.routing.RoutingDecision;
 import com.ayigroup.rabbitmq.playground.routing.RoutingEvaluatorFactory;
@@ -50,6 +51,7 @@ public class MessagePublisherService {
     private final ScenarioService scenarioService;
     private final RoutingEvaluatorFactory evaluatorFactory;
     private final ExchangeToExchangeRoutingEvaluator exchangeToExchangeEvaluator;
+    private final AlternateExchangeRoutingEvaluator alternateExchangeEvaluator;
     private final EventBroadcaster eventBroadcaster;
     private final MessageHistoryService historyService;
     private final ScheduledExecutorService eventScheduler;
@@ -81,7 +83,7 @@ public class MessagePublisherService {
                 .build();
         historyService.append(scenarioId, record);
 
-        BoundExchange enteredExchange = scenario.getType() == ExchangeType.EXCHANGE_TO_EXCHANGE
+        BoundExchange enteredExchange = scenario.getSecondaryExchangeName() != null
                 ? resolveTargetExchange(request)
                 : null;
         eventBroadcaster.broadcast(scenarioId,
@@ -119,6 +121,9 @@ public class MessagePublisherService {
         if (scenario.getType() == ExchangeType.EXCHANGE_TO_EXCHANGE) {
             return exchangeToExchangeEvaluator.evaluate(scenario, resolveTargetExchange(request), displayRoutingKey);
         }
+        if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
+            return alternateExchangeEvaluator.evaluate(scenario, resolveTargetExchange(request), displayRoutingKey);
+        }
         return evaluatorFactory.forType(scenario.getType()).evaluate(scenario, displayRoutingKey, request.getHeaders());
     }
 
@@ -152,9 +157,9 @@ public class MessagePublisherService {
         }
     }
 
-    /** Para casi todos los tipos es el único exchange del escenario; EXCHANGE_TO_EXCHANGE elige según targetExchange. */
+    /** Para casi todos los tipos es el único exchange del escenario; los que tienen exchange secundario eligen según targetExchange. */
     private String resolveAmqpExchange(Scenario scenario, PublishMessageRequest request) {
-        if (scenario.getType() == ExchangeType.EXCHANGE_TO_EXCHANGE && resolveTargetExchange(request) == BoundExchange.SECONDARY) {
+        if (scenario.getSecondaryExchangeName() != null && resolveTargetExchange(request) == BoundExchange.SECONDARY) {
             return scenario.getSecondaryExchangeName();
         }
         return scenario.getExchangeName();

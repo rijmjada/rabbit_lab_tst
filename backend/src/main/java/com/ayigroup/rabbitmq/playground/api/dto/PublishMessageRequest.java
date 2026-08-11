@@ -20,7 +20,7 @@ public class PublishMessageRequest {
     /** Solo para el Default Exchange: nombre (label) de la cola destino. */
     private String targetQueue;
 
-    /** Solo para EXCHANGE_TO_EXCHANGE: a cuál de los dos exchanges se publica. Null equivale a PRIMARY. */
+    /** Solo para EXCHANGE_TO_EXCHANGE y ALTERNATE_EXCHANGE: a cuál de los dos exchanges se publica. Null equivale a PRIMARY. */
     private BoundExchange targetExchange;
 
     private boolean mandatory = true;

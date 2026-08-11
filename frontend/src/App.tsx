@@ -7,6 +7,7 @@ import { TopicScreen } from "./features/topic/TopicScreen";
 import { HeadersScreen } from "./features/headers/HeadersScreen";
 import { DefaultScreen } from "./features/default/DefaultScreen";
 import { ExchangeToExchangeScreen } from "./features/exchange-to-exchange/ExchangeToExchangeScreen";
+import { AlternateExchangeScreen } from "./features/alternate-exchange/AlternateExchangeScreen";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/headers" element={<HeadersScreen />} />
           <Route path="/default" element={<DefaultScreen />} />
           <Route path="/exchange-to-exchange" element={<ExchangeToExchangeScreen />} />
+          <Route path="/alternate-exchange" element={<AlternateExchangeScreen />} />
         </Route>
       </Routes>
     </BrowserRouter>

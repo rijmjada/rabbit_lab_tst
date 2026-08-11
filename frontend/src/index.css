@@ -45,12 +45,14 @@
 
   /* Colores de identidad de cada módulo (ver lib/moduleColors.ts), usados
      por el nav, la home y los diagramas de topología. Exchange↔Exchange
-     reusa --color-bridge en vez de tener su propio token. */
+     reusa --color-bridge en vez de tener su propio token; Alternate
+     Exchange sí tiene el suyo (--module-alternate). */
   --module-fanout: #f59e0b;
   --module-direct: #2563eb;
   --module-topic: #7c3aed;
   --module-headers: #0d9488;
   --module-default: #475569;
+  --module-alternate: #4f46e5;
   /* El productor siempre usa este acento fijo (cyan), independiente del
      módulo — así se distingue claramente de la caja del exchange, que sí
      usa el color de identidad de cada módulo. */
@@ -107,6 +109,7 @@
   --module-topic: #a78bfa;
   --module-headers: #2dd4bf;
   --module-default: #94a3b8;
+  --module-alternate: #818cf8;
   --color-node-producer: #22d3ee;
 }
 

@@ -44,6 +44,13 @@ const SECTIONS = [
     icon: "🔗",
     color: MODULE_ACCENTS.bridge,
   },
+  {
+    to: "/alternate-exchange",
+    title: "Alternate Exchange",
+    desc: "Un exchange con un exchange alternativo configurado: lo que no matchea nada se reenvía solo, sin perderse.",
+    icon: "🛟",
+    color: MODULE_ACCENTS.alternate,
+  },
 ];
 
 export function HomeScreen() {

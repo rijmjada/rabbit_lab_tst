@@ -12,4 +12,5 @@ export const MODULE_ACCENTS = {
   headers: "var(--module-headers)",
   default: "var(--module-default)",
   bridge: "var(--color-bridge)",
+  alternate: "var(--module-alternate)",
 } as const;

@@ -28,10 +28,10 @@ public class QueueConfigDto {
     private AckMode ackMode;
 
     /**
-     * Solo relevante para EXCHANGE_TO_EXCHANGE. Se expone para que el
-     * frontend sepa a qué exchange agrupar cada cola en el diagrama y en
-     * el editor de bindings, pero es de solo lectura: updateBindings()
-     * nunca reasigna este campo después de creado el escenario.
+     * Solo relevante para EXCHANGE_TO_EXCHANGE y ALTERNATE_EXCHANGE. Se
+     * expone para que el frontend sepa a qué exchange agrupar cada cola en
+     * el diagrama y en el editor de bindings, pero es de solo lectura:
+     * updateBindings() nunca reasigna este campo después de creado el escenario.
      */
     private BoundExchange boundExchange;
 

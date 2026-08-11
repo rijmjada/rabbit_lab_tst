@@ -1,10 +1,17 @@
-export type ExchangeType = "FANOUT" | "DIRECT" | "TOPIC" | "HEADERS" | "DEFAULT" | "EXCHANGE_TO_EXCHANGE";
+export type ExchangeType =
+  | "FANOUT"
+  | "DIRECT"
+  | "TOPIC"
+  | "HEADERS"
+  | "DEFAULT"
+  | "EXCHANGE_TO_EXCHANGE"
+  | "ALTERNATE_EXCHANGE";
 
 export type AckMode = "AUTO" | "MANUAL";
 
 export type ScenarioStatus = "CREATED" | "RUNNING" | "STOPPED";
 
-/** Solo tiene sentido para EXCHANGE_TO_EXCHANGE: a cuál de los dos exchanges pertenece algo. */
+/** Solo tiene sentido para EXCHANGE_TO_EXCHANGE y ALTERNATE_EXCHANGE: a cuál de los dos exchanges pertenece algo. */
 export type BoundExchange = "PRIMARY" | "SECONDARY";
 
 export interface QueueConfig {
@@ -15,7 +22,7 @@ export interface QueueConfig {
   headers?: Record<string, string> | null;
   xMatch?: "all" | "any" | null;
   ackMode?: AckMode;
-  /** Solo para EXCHANGE_TO_EXCHANGE; fijo desde la creación del escenario. */
+  /** Solo para EXCHANGE_TO_EXCHANGE / ALTERNATE_EXCHANGE; fijo desde la creación del escenario. */
   boundExchange?: BoundExchange;
 }
 
@@ -24,7 +31,7 @@ export interface Scenario {
   type: ExchangeType;
   status: ScenarioStatus;
   exchangeName: string;
-  /** Solo para EXCHANGE_TO_EXCHANGE: el segundo exchange de la cadena. */
+  /** EXCHANGE_TO_EXCHANGE: el segundo exchange de la cadena. ALTERNATE_EXCHANGE: el exchange alternativo. */
   secondaryExchangeName?: string;
   /** Solo para EXCHANGE_TO_EXCHANGE: binding key del puente exchangeName -> secondaryExchangeName. */
   bridgeBindingKey?: string;
@@ -43,7 +50,7 @@ export interface PublishMessageRequest {
   routingKey?: string;
   headers?: Record<string, string>;
   targetQueue?: string;
-  /** Solo para EXCHANGE_TO_EXCHANGE: a cuál de los dos exchanges se publica. */
+  /** Solo para EXCHANGE_TO_EXCHANGE / ALTERNATE_EXCHANGE: a cuál de los dos exchanges se publica. */
   targetExchange?: BoundExchange;
   mandatory?: boolean;
   persistent?: boolean;
@@ -86,7 +93,7 @@ export interface MessageEventDto {
   payload?: Record<string, unknown>;
   routingKey?: string;
   headers?: Record<string, string>;
-  /** Solo en MESSAGE_PUBLISHED de un escenario EXCHANGE_TO_EXCHANGE. */
+  /** Solo en MESSAGE_PUBLISHED de un escenario EXCHANGE_TO_EXCHANGE / ALTERNATE_EXCHANGE. */
   enteredExchange?: BoundExchange;
   routingResult?: RoutingDecision[];
   queueName?: string;

@@ -300,15 +300,17 @@ src/
 │   ├── useScenarioSocket.ts  se suscribe al topic de eventos de un escenario
 │   ├── useMessageHistory.ts  historial + lo va actualizando con eventos en vivo
 │   ├── useTopologyAnimation.ts  traduce eventos crudos → estado visual para el diagrama
-│   └── useExchangeBridgeAnimation.ts  lo mismo que el anterior, pero para dos exchanges + puente
+│   ├── useExchangeBridgeAnimation.ts  lo mismo que el anterior, pero para dos exchanges + puente
+│   └── useAlternateExchangeAnimation.ts  lo mismo, para exchange principal + alternativo
 ├── components/
 │   ├── layout/Shell.tsx       sidebar + navegación + outlet de rutas
 │   ├── topology/TopologyCanvas.tsx + topology.css   el diagrama SVG+HTML animado (1 exchange)
 │   ├── topology/ExchangeBridgeCanvas.tsx             el mismo diagrama, para 2 exchanges + puente
+│   ├── topology/AlternateExchangeCanvas.tsx          el mismo diagrama, para principal + alternativo
 │   ├── scenario/ScenarioControls.tsx   botones Crear/Reiniciar/Limpiar
 │   ├── messaging/MessageComposer.tsx    formulario de publicar
 │   ├── messaging/MessageHistoryList.tsx  lista expandible de mensajes enviados
-│   ├── binding/BindingEditor.tsx         editor de bindings (4 variantes: direct/topic/headers/exchange-bridge)
+│   ├── binding/BindingEditor.tsx         editor de bindings (5 variantes: direct/topic/headers/exchange-bridge/alternate-exchange)
 │   └── explain/ExplanationPanel.tsx      el cartel celeste con la explicación de cada pantalla
 └── features/
     ├── home/HomeScreen.tsx
@@ -317,7 +319,8 @@ src/
     ├── topic/TopicScreen.tsx
     ├── headers/HeadersScreen.tsx
     ├── default/DefaultScreen.tsx
-    └── exchange-to-exchange/ExchangeToExchangeScreen.tsx
+    ├── exchange-to-exchange/ExchangeToExchangeScreen.tsx
+    └── alternate-exchange/AlternateExchangeScreen.tsx
 ```
 
 ### 6.1. Por qué no hay `<StrictMode>`
@@ -549,6 +552,77 @@ Se optó por **no** generalizar `TopologyCanvas`/`useTopologyAnimation` para sop
 
 ---
 
-## 12. Cómo correr todo
+## 12. El módulo "Alternate Exchange": reenvío automático de lo no enrutado
+
+Contraste pedagógico con el módulo anterior: en "Exchange → Exchange" un binding reenvía lo que **sí** matchea un patrón. Acá es la otra cara de la misma moneda — un exchange puede declararse con un argumento `alternate-exchange` apuntando a otro exchange, y RabbitMQ reenvía ahí, automáticamente, **todo mensaje que no matchea ningún binding** del exchange principal. No hay ningún patrón que configurar para que el reenvío se dispare: el disparador es, exactamente, "nada matcheó".
+
+Verificado contra un RabbitMQ real: la UI de management muestra el `arguments` del exchange principal con `"alternate-exchange": "<nombre del alternativo>"`, y un mensaje con `mandatory=true` que no matchea ningún binding propio termina con ACK real en la cola del alternativo — **no** se devuelve (`MESSAGE_RETURNED`), porque para RabbitMQ terminar en el alternate exchange también cuenta como "enrutado".
+
+### 12.1. Por qué el exchange principal es Direct y el alternativo es Fanout
+
+`ALTERNATE_EXCHANGE` es un valor más de `ExchangeType`, mismo criterio que `EXCHANGE_TO_EXCHANGE`. El principal es **Direct** (matching trivial de leer, para no competir por atención con el concepto nuevo) y el alternativo es **Fanout** — el uso real más común de esta feature es justamente un "catch-all" que recibe todo sin importar la key, sin necesidad de declarar ningún binding key en el alternativo. También le da variedad de tipos frente al módulo anterior (que encadenaba dos Topic).
+
+### 12.2. Modelo: reusa `BoundExchange`, sin equivalente al "bridge key"
+
+- Reusa `secondaryExchangeName` (el exchange alternativo) y el enum `BoundExchange` (`PRIMARY`/`SECONDARY`) tal cual como están, sin agregar ningún tipo nuevo — a diferencia del puente, que sí tiene una key editable (`bridgeBindingKey`), la relación alternate-exchange **no tiene ningún estado editable propio**: es un argumento fijo del exchange principal, declarado una sola vez al crear el escenario y nunca vuelto a tocar. `bridgeBindingKey` queda `null` para este tipo.
+- Escenario de demostración por defecto (`ScenarioDefaults`):
+
+```
+Exchange "Pedidos" (Direct) — con alternate-exchange = exchange de abajo
+  ├─ Cola "Urgentes"  bindingKey = "urgente"
+  └─ Cola "Normales"  bindingKey = "normal"
+
+Exchange "Sin clasificar" (Fanout, alternativo)
+  └─ Cola "Huérfanos"  (fanout, sin binding key)
+```
+
+- Nombres reales: `ScenarioService.typeSlug()` mapea este tipo al slug corto `"alt"`. Resultado: `edu.<sesión>.alt.main` (principal), `edu.<sesión>.alt.exchange2` (alternativo), `edu.<sesión>.alt.<slug-cola>` por cada cola.
+
+### 12.3. Declarar el alternate exchange de verdad (`TopologyManager`)
+
+Spring AMQP tiene soporte de primera clase para esto — no hace falta declarar el argumento a mano con `withArgument("alternate-exchange", ...)`, `ExchangeBuilder` ya tiene un método dedicado (confirmado con `javap` contra el jar real del proyecto):
+
+```java
+DirectExchange main = ExchangeBuilder.directExchange(scenario.getExchangeName())
+        .durable(true)
+        .alternate(scenario.getSecondaryExchangeName())
+        .build();
+```
+
+`declareAlternateExchange` declara primero el Fanout alternativo y después el Direct principal (con el argumento ya apuntando a un nombre que existe). A diferencia del puente de `EXCHANGE_TO_EXCHANGE`, acá `rebindAlternateExchange` es más simple: no hay nada análogo a "la binding key del puente" que quitar y volver a poner — el argumento se fija una sola vez al declarar y nunca se reconfigura, así que reconfigurar bindings solo significa re-bindear colas (`alternateQueueBinding`: la cola `SECONDARY` se bindea al Fanout sin key, las `PRIMARY` al Direct con su `bindingKey`, mismo patrón que el caso `DIRECT` ya existente).
+
+### 12.4. Routing explicado (`AlternateExchangeRoutingEvaluator`)
+
+Mismo motivo que `ExchangeToExchangeRoutingEvaluator` para no implementar `RoutingEvaluator`: necesita `BoundExchange target`, que esa interfaz no modela. La lógica es más simple que la del puente porque no hay ningún patrón que evaluar para el reenvío:
+
+- Si se publica directo en el alternativo, se comporta como un Fanout puro (todas sus colas matchean, las del principal no).
+- Si se publica en el principal: match exacto por `bindingKey` en cada cola `PRIMARY` (igual que `DirectRoutingEvaluator`); la cola `SECONDARY` matchea **si y solo si ninguna cola `PRIMARY` matcheó** — ese `anyDirectMatch` es el corazón del concepto.
+
+Verificado con los 4 casos de la demo:
+
+| Se publica en | Routing key | Resultado real (verificado) |
+|---|---|---|
+| Principal | `urgente` | Matchea "Urgentes" directo; el alternativo nunca se activa |
+| Principal | `normal` | Matchea "Normales" directo; el alternativo nunca se activa |
+| Principal | `vip` | No matchea ni "Urgentes" ni "Normales" → RabbitMQ reenvía sola al alternativo → ACK real en "Huérfanos", **`unrouted: false`** a pesar de `mandatory=true` |
+| Alternativo | (cualquiera) | Matchea "Huérfanos" directo (fanout), sin pasar por el principal |
+
+El tercer caso es la lección central del módulo, y es lo opuesto exacto a la lección del puente: ahí "no matchear nada" significaba mensaje devuelto; acá, gracias al alternate exchange, "no matchear nada" significa que el mensaje de todos modos llega a algún lado.
+
+### 12.5. Publicar a uno de dos exchanges — generalización en `MessagePublisherService`
+
+En vez de agregar un segundo `if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE)` al lado del que ya existía para `EXCHANGE_TO_EXCHANGE`, se generalizaron los dos chequeos de `resolveAmqpExchange()` y del cálculo de `enteredExchange` en `publish()` para que miren `scenario.getSecondaryExchangeName() != null` en vez del tipo puntual — ese campo ya es `null` salvo en los tipos que efectivamente tienen un segundo exchange, así que cualquier módulo futuro con la misma forma reusa la rama sin tocar código.
+
+### 12.6. Frontend: mismo patrón de "diagrama y hook dedicados", con una generalización de CSS
+
+Se reimplementó el mismo patrón que `ExchangeBridgeCanvas`/`useExchangeBridgeAnimation` (`AlternateExchangeCanvas`/`useAlternateExchangeAnimation`), con dos diferencias de fondo:
+
+- **El disparador del "reenvío" es distinto**: en el puente, `ROUTING_EVALUATED` cruza si alguna decisión de la cola remota matcheó un patrón; acá, `useAlternateExchangeAnimation` dispara `rerouteTick` si la cola `SECONDARY` matcheó — que, por la lógica del evaluador, pasa exactamente cuando nada matcheó en el lado principal. Mismo delay (`REROUTE_DELAY_MS`, 750ms) antes de aplicar las decisiones del lado alternativo, para que la cola no "se entere" antes de que se vea viajar el paquete — la misma lección visual ya aprendida con el módulo anterior, esta vez incluida desde el primer commit (ahí se había olvidado inicialmente pasar `resetSignal`, rompiendo "Reiniciar"; acá se agregó de entrada).
+- **Se generalizó el CSS del conector**: `.edge-bridge`/`.packet-bridge`/`.bridge-label` (hardcodeados a `var(--color-bridge)`, rosa) pasaron a llamarse `.edge-connector`/`.packet-connector`/`.connector-label`, usando `var(--accent, var(--color-primary))` — el mismo patrón que ya usaba `.node-exchange`. `ExchangeBridgeCanvas` sigue viéndose igual (fija `--accent: var(--color-bridge)` en su wrapper); `AlternateExchangeCanvas` fija `--accent: var(--module-alternate)` (índigo, token nuevo en `index.css` con su variante para tema oscuro) y reusa las mismas tres reglas sin duplicarlas.
+- **`BindingEditor`** gana una quinta variante (`"alternate-exchange"`): una tabla editable tipo Direct solo para las colas del exchange principal, y una línea informativa (no editable) para la cola del alternativo — coherente con que el módulo Fanout standalone tampoco expone nada editable para sus colas.
+
+---
+
+## 13. Cómo correr todo
 
 Ver `README.md` para el paso a paso completo. Como referencia rápida: RabbitMQ vía `docker compose up -d`, backend con `mvn spring-boot:run` (puerto 8080), frontend con `npm run dev` (puerto 5173). Hay un script `start.ps1` en la raíz del repo que automatiza las tres cosas en orden, esperando a que cada una esté lista antes de seguir con la siguiente (`./start.ps1` para levantar todo, `./start.ps1 -Stop` para bajarlo).

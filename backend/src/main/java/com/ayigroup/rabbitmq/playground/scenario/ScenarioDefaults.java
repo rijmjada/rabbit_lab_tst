@@ -70,6 +70,22 @@ public final class ScenarioDefaults {
                             .boundExchange(BoundExchange.SECONDARY)
                             .build()
             );
+            case ALTERNATE_EXCHANGE -> List.of(
+                    QueueConfig.builder()
+                            .label("Urgentes")
+                            .bindingKey("urgente")
+                            .boundExchange(BoundExchange.PRIMARY)
+                            .build(),
+                    QueueConfig.builder()
+                            .label("Normales")
+                            .bindingKey("normal")
+                            .boundExchange(BoundExchange.PRIMARY)
+                            .build(),
+                    QueueConfig.builder()
+                            .label("Huerfanos")
+                            .boundExchange(BoundExchange.SECONDARY)
+                            .build()
+            );
         };
     }
 

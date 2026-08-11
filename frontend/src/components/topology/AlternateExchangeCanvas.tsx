@@ -9,69 +9,68 @@ interface Box {
   h: number;
 }
 
-interface ExchangeBridgeCanvasProps {
+interface AlternateExchangeCanvasProps {
   producerLabel?: string;
-  primaryExchangeLabel: string;
-  secondaryExchangeLabel: string;
-  bridgeBindingKey: string;
-  primaryQueues: QueueVisualState[];
-  secondaryQueues: QueueVisualState[];
+  mainExchangeLabel: string;
+  alternateExchangeLabel: string;
+  mainQueues: QueueVisualState[];
+  alternateQueues: QueueVisualState[];
   queueSubLabel: (queueName: string) => string;
   producerTick: number;
-  primaryExchangeTick: number;
-  secondaryExchangeTick: number;
-  bridgeTick: number;
+  mainExchangeTick: number;
+  alternateExchangeTick: number;
+  rerouteTick: number;
 }
 
 const WIDTH = 1090;
 const ROW_HEIGHT = 150;
 const TOP_PADDING = 20;
-// Espacio entre las dos "bandas" (Exchange 1 arriba, Exchange 2 abajo)
-// donde vive el conector del binding puente.
+// Espacio entre las dos "bandas" (principal arriba, alternativo abajo)
+// donde vive el conector de reenvío.
 const BAND_GAP = 110;
 
 function bandHeight(count: number) {
   return Math.max(count * ROW_HEIGHT + TOP_PADDING, 260);
 }
 
-function layout(primaryCount: number, secondaryCount: number) {
-  const primaryH = bandHeight(Math.max(primaryCount, 1));
-  const secondaryH = bandHeight(Math.max(secondaryCount, 1));
-  const height = primaryH + BAND_GAP + secondaryH;
+function layout(mainCount: number, alternateCount: number) {
+  const mainH = bandHeight(Math.max(mainCount, 1));
+  const alternateH = bandHeight(Math.max(alternateCount, 1));
+  const height = mainH + BAND_GAP + alternateH;
 
-  const primaryCenterY = primaryH / 2;
-  const secondaryTop = primaryH + BAND_GAP;
-  const secondaryCenterY = secondaryTop + secondaryH / 2;
+  const mainCenterY = mainH / 2;
+  const alternateTop = mainH + BAND_GAP;
+  const alternateCenterY = alternateTop + alternateH / 2;
   const allCenterY = height / 2;
 
   const producer = { x: 16, y: allCenterY - 34, w: 175, h: 68 };
-  const primaryExchange = { x: 220, y: primaryCenterY - 42, w: 300, h: 84 };
-  const secondaryExchange = { x: 220, y: secondaryCenterY - 42, w: 300, h: 84 };
+  const mainExchange = { x: 220, y: mainCenterY - 42, w: 300, h: 84 };
+  const alternateExchange = { x: 220, y: alternateCenterY - 42, w: 300, h: 84 };
 
-  const primaryQueues = Array.from({ length: primaryCount }, (_, i) => ({
+  const mainQueues = Array.from({ length: mainCount }, (_, i) => ({
     x: 575,
     y: TOP_PADDING + i * ROW_HEIGHT,
     w: 250,
     h: 115,
   }));
-  const secondaryQueues = Array.from({ length: secondaryCount }, (_, i) => ({
+  const alternateQueues = Array.from({ length: alternateCount }, (_, i) => ({
     x: 575,
-    y: secondaryTop + TOP_PADDING + i * ROW_HEIGHT,
+    y: alternateTop + TOP_PADDING + i * ROW_HEIGHT,
     w: 250,
     h: 115,
   }));
-  const primaryConsumers = primaryQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
-  const secondaryConsumers = secondaryQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
+  const mainConsumers = mainQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
+  const alternateConsumers = alternateQueues.map((q) => ({ x: 880, y: q.y + 21, w: 175, h: 72 }));
 
   return {
     height,
     producer,
-    primaryExchange,
-    secondaryExchange,
-    primaryQueues,
-    secondaryQueues,
-    primaryConsumers,
-    secondaryConsumers,
+    mainExchange,
+    alternateExchange,
+    mainQueues,
+    alternateQueues,
+    mainConsumers,
+    alternateConsumers,
   };
 }
 
@@ -226,81 +225,80 @@ function queueAndConsumerNodes(
   );
 }
 
-export function ExchangeBridgeCanvas({
+export function AlternateExchangeCanvas({
   producerLabel = "Productor",
-  primaryExchangeLabel,
-  secondaryExchangeLabel,
-  bridgeBindingKey,
-  primaryQueues,
-  secondaryQueues,
+  mainExchangeLabel,
+  alternateExchangeLabel,
+  mainQueues,
+  alternateQueues,
   queueSubLabel,
   producerTick,
-  primaryExchangeTick,
-  secondaryExchangeTick,
-  bridgeTick,
-}: ExchangeBridgeCanvasProps) {
+  mainExchangeTick,
+  alternateExchangeTick,
+  rerouteTick,
+}: AlternateExchangeCanvasProps) {
   const {
     height,
     producer,
-    primaryExchange,
-    secondaryExchange,
-    primaryQueues: primaryQueuePositions,
-    secondaryQueues: secondaryQueuePositions,
-    primaryConsumers,
-    secondaryConsumers,
-  } = layout(Math.max(primaryQueues.length, 1), Math.max(secondaryQueues.length, 1));
+    mainExchange,
+    alternateExchange,
+    mainQueues: mainQueuePositions,
+    alternateQueues: alternateQueuePositions,
+    mainConsumers,
+    alternateConsumers,
+  } = layout(Math.max(mainQueues.length, 1), Math.max(alternateQueues.length, 1));
 
   const producerActive = usePulseClass(producerTick);
-  const primaryActive = usePulseClass(primaryExchangeTick);
-  const secondaryActive = usePulseClass(secondaryExchangeTick);
+  const mainActive = usePulseClass(mainExchangeTick);
+  const alternateActive = usePulseClass(alternateExchangeTick);
 
-  const bridgeD = verticalCurve(
-    primaryExchange.x + primaryExchange.w / 2,
-    primaryExchange.y + primaryExchange.h,
-    secondaryExchange.x + secondaryExchange.w / 2,
-    secondaryExchange.y,
+  const connectorD = verticalCurve(
+    mainExchange.x + mainExchange.w / 2,
+    mainExchange.y + mainExchange.h,
+    alternateExchange.x + alternateExchange.w / 2,
+    alternateExchange.y,
   );
-  const bridgeMidX = (primaryExchange.x + primaryExchange.w / 2 + secondaryExchange.x + secondaryExchange.w / 2) / 2;
-  const bridgeMidY = (primaryExchange.y + primaryExchange.h + secondaryExchange.y) / 2;
-  const bridgeLabelBox: Box = { x: bridgeMidX - 130, y: bridgeMidY - 18, w: 260, h: 36 };
+  const connectorMidX = (mainExchange.x + mainExchange.w / 2 + alternateExchange.x + alternateExchange.w / 2) / 2;
+  const connectorMidY = (mainExchange.y + mainExchange.h + alternateExchange.y) / 2;
+  const connectorLabelBox: Box = { x: connectorMidX - 130, y: connectorMidY - 18, w: 260, h: 36 };
 
   return (
-    <div className="topology-wrapper" style={{ height, "--accent": "var(--color-bridge)" } as React.CSSProperties}>
+    <div className="topology-wrapper" style={{ height, "--accent": "var(--module-alternate)" } as React.CSSProperties}>
       <svg className="topology-svg" viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none">
         <path
           className="topology-edge"
-          d={curve(producer.x + producer.w, producer.y + producer.h / 2, primaryExchange.x, primaryExchange.y + primaryExchange.h / 2)}
+          d={curve(producer.x + producer.w, producer.y + producer.h / 2, mainExchange.x, mainExchange.y + mainExchange.h / 2)}
         />
         <path
           className="topology-edge"
-          d={curve(producer.x + producer.w, producer.y + producer.h / 2, secondaryExchange.x, secondaryExchange.y + secondaryExchange.h / 2)}
+          d={curve(producer.x + producer.w, producer.y + producer.h / 2, alternateExchange.x, alternateExchange.y + alternateExchange.h / 2)}
         />
 
         <path
-          key={`bridge-${bridgeTick}`}
-          className={"topology-edge edge-connector" + (bridgeTick > 0 ? " edge-flowing" : "")}
-          d={bridgeD}
+          key={`connector-${rerouteTick}`}
+          className={"topology-edge edge-connector" + (rerouteTick > 0 ? " edge-flowing" : "")}
+          d={connectorD}
         />
-        {bridgeTick > 0 && (
+        {rerouteTick > 0 && (
           <circle
-            key={`packet-bridge-${bridgeTick}`}
+            key={`packet-connector-${rerouteTick}`}
             className="packet-dot packet-connector"
             r={5}
-            style={{ offsetPath: `path('${bridgeD}')` } as React.CSSProperties}
+            style={{ offsetPath: `path('${connectorD}')` } as React.CSSProperties}
           />
         )}
 
         {queueEdgesAndDots(
-          { x: primaryExchange.x + primaryExchange.w, y: primaryExchange.y + primaryExchange.h / 2 },
-          primaryQueues,
-          primaryQueuePositions,
-          primaryConsumers,
+          { x: mainExchange.x + mainExchange.w, y: mainExchange.y + mainExchange.h / 2 },
+          mainQueues,
+          mainQueuePositions,
+          mainConsumers,
         )}
         {queueEdgesAndDots(
-          { x: secondaryExchange.x + secondaryExchange.w, y: secondaryExchange.y + secondaryExchange.h / 2 },
-          secondaryQueues,
-          secondaryQueuePositions,
-          secondaryConsumers,
+          { x: alternateExchange.x + alternateExchange.w, y: alternateExchange.y + alternateExchange.h / 2 },
+          alternateQueues,
+          alternateQueuePositions,
+          alternateConsumers,
         )}
       </svg>
 
@@ -311,29 +309,29 @@ export function ExchangeBridgeCanvas({
       </div>
 
       <div
-        className={"topology-node node-exchange" + (primaryActive ? " node-pulse" : "")}
-        style={{ ...box(primaryExchange, height), animationDelay: "0.05s" }}
+        className={"topology-node node-exchange" + (mainActive ? " node-pulse" : "")}
+        style={{ ...box(mainExchange, height), animationDelay: "0.05s" }}
       >
-        <div className="node-kind">Exchange 1</div>
-        <div className="node-label" title={primaryExchangeLabel}>{primaryExchangeLabel}</div>
-        <div className="node-sub">tipo: topic</div>
+        <div className="node-kind">Exchange principal</div>
+        <div className="node-label" title={mainExchangeLabel}>{mainExchangeLabel}</div>
+        <div className="node-sub">tipo: direct</div>
       </div>
 
       <div
-        className={"topology-node node-exchange" + (secondaryActive ? " node-pulse" : "")}
-        style={{ ...box(secondaryExchange, height), animationDelay: "0.08s" }}
+        className={"topology-node node-exchange" + (alternateActive ? " node-pulse" : "")}
+        style={{ ...box(alternateExchange, height), animationDelay: "0.08s" }}
       >
-        <div className="node-kind">Exchange 2</div>
-        <div className="node-label" title={secondaryExchangeLabel}>{secondaryExchangeLabel}</div>
-        <div className="node-sub">tipo: topic</div>
+        <div className="node-kind">Exchange alternativo</div>
+        <div className="node-label" title={alternateExchangeLabel}>{alternateExchangeLabel}</div>
+        <div className="node-sub">tipo: fanout</div>
       </div>
 
-      <div className="connector-label" style={box(bridgeLabelBox, height)} title={`Binding puente: ${bridgeBindingKey}`}>
-        puente: {bridgeBindingKey || "(vacío)"}
+      <div className="connector-label" style={box(connectorLabelBox, height)} title="alternate-exchange">
+        alternate exchange
       </div>
 
-      {queueAndConsumerNodes(primaryQueues, primaryQueuePositions, primaryConsumers, height, queueSubLabel, 0.1)}
-      {queueAndConsumerNodes(secondaryQueues, secondaryQueuePositions, secondaryConsumers, height, queueSubLabel, 0.16)}
+      {queueAndConsumerNodes(mainQueues, mainQueuePositions, mainConsumers, height, queueSubLabel, 0.1)}
+      {queueAndConsumerNodes(alternateQueues, alternateQueuePositions, alternateConsumers, height, queueSubLabel, 0.16)}
     </div>
   );
 }

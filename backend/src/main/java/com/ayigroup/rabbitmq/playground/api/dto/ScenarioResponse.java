@@ -16,7 +16,7 @@ public class ScenarioResponse {
     private ScenarioStatus status;
     private String exchangeName;
 
-    /** Solo para EXCHANGE_TO_EXCHANGE. */
+    /** secondaryExchangeName: EXCHANGE_TO_EXCHANGE y ALTERNATE_EXCHANGE. bridgeBindingKey: solo EXCHANGE_TO_EXCHANGE. */
     private String secondaryExchangeName;
     private String bridgeBindingKey;
 

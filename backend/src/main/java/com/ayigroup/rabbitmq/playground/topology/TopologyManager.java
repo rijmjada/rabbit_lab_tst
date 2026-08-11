@@ -10,6 +10,7 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.ExchangeBuilder;
 import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.core.HeadersExchange;
 import org.springframework.amqp.core.Queue;
@@ -37,6 +38,10 @@ public class TopologyManager {
     public void declare(Scenario scenario) {
         if (scenario.getType() == ExchangeType.EXCHANGE_TO_EXCHANGE) {
             declareExchangeToExchange(scenario);
+            return;
+        }
+        if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
+            declareAlternateExchange(scenario);
             return;
         }
         if (scenario.getType() != ExchangeType.DEFAULT) {
@@ -69,6 +74,10 @@ public class TopologyManager {
             rebindExchangeToExchange(scenario, previousQueues, previousBridgeBindingKey);
             return;
         }
+        if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
+            rebindAlternateExchange(scenario, previousQueues);
+            return;
+        }
         for (QueueConfig previous : previousQueues) {
             removeBindingQuietly(scenario, previous);
         }
@@ -85,6 +94,10 @@ public class TopologyManager {
     public void delete(Scenario scenario) {
         if (scenario.getType() == ExchangeType.EXCHANGE_TO_EXCHANGE) {
             deleteExchangeToExchange(scenario);
+            return;
+        }
+        if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
+            deleteAlternateExchange(scenario);
             return;
         }
         for (QueueConfig q : scenario.getQueues()) {
@@ -118,6 +131,8 @@ public class TopologyManager {
             case DEFAULT -> throw new IllegalStateException("El Default Exchange no se declara explícitamente");
             case EXCHANGE_TO_EXCHANGE -> throw new IllegalStateException(
                     "EXCHANGE_TO_EXCHANGE declara dos exchanges propios, ver declareExchangeToExchange()");
+            case ALTERNATE_EXCHANGE -> throw new IllegalStateException(
+                    "ALTERNATE_EXCHANGE declara dos exchanges propios, ver declareAlternateExchange()");
         };
     }
 
@@ -135,6 +150,8 @@ public class TopologyManager {
             case DEFAULT -> throw new IllegalStateException("El Default Exchange no admite bindings manuales");
             case EXCHANGE_TO_EXCHANGE -> throw new IllegalStateException(
                     "EXCHANGE_TO_EXCHANGE resuelve el binding de cada cola según boundExchange, ver queueBinding()");
+            case ALTERNATE_EXCHANGE -> throw new IllegalStateException(
+                    "ALTERNATE_EXCHANGE resuelve el binding de cada cola según boundExchange, ver alternateQueueBinding()");
         };
     }
 
@@ -201,6 +218,67 @@ public class TopologyManager {
 
     private Binding bridgeBindingWithKey(TopicExchange primary, TopicExchange secondary, String bridgePattern) {
         return BindingBuilder.bind(secondary).to(primary).with(nullToEmpty(bridgePattern));
+    }
+
+    // ---------- ALTERNATE_EXCHANGE ----------
+
+    private void declareAlternateExchange(Scenario scenario) {
+        FanoutExchange alternate = new FanoutExchange(scenario.getSecondaryExchangeName(), true, false);
+        rabbitAdmin.declareExchange(alternate);
+
+        DirectExchange main = ExchangeBuilder.directExchange(scenario.getExchangeName())
+                .durable(true)
+                .alternate(scenario.getSecondaryExchangeName())
+                .build();
+        rabbitAdmin.declareExchange(main);
+
+        for (QueueConfig q : scenario.getQueues()) {
+            rabbitAdmin.declareQueue(QueueBuilder.durable(q.getName()).build());
+            rabbitAdmin.declareBinding(alternateQueueBinding(q, main, alternate));
+        }
+
+        log.info("Escenario {} (ALTERNATE_EXCHANGE) declarado: exchange='{}', alternativo='{}', colas={}",
+                scenario.getId(), scenario.getExchangeName(), scenario.getSecondaryExchangeName(), scenario.getQueues().size());
+    }
+
+    private void rebindAlternateExchange(Scenario scenario, List<QueueConfig> previousQueues) {
+        DirectExchange main = new DirectExchange(scenario.getExchangeName());
+        FanoutExchange alternate = new FanoutExchange(scenario.getSecondaryExchangeName());
+
+        // A diferencia del puente de EXCHANGE_TO_EXCHANGE, acá no hay nada
+        // análogo a una "binding key del puente" que remover/recrear: el
+        // argumento alternate-exchange se fija una sola vez al declarar el
+        // exchange principal y no se vuelve a tocar. Solo se re-bindean colas.
+        for (QueueConfig previous : previousQueues) {
+            removeBindingQuietly(alternateQueueBinding(previous, main, alternate), previous.getName());
+        }
+        for (QueueConfig current : scenario.getQueues()) {
+            rabbitAdmin.declareBinding(alternateQueueBinding(current, main, alternate));
+        }
+
+        log.info("Escenario {} (ALTERNATE_EXCHANGE) re-configurado con nuevos bindings", scenario.getId());
+    }
+
+    private void deleteAlternateExchange(Scenario scenario) {
+        DirectExchange main = new DirectExchange(scenario.getExchangeName());
+        FanoutExchange alternate = new FanoutExchange(scenario.getSecondaryExchangeName());
+
+        for (QueueConfig q : scenario.getQueues()) {
+            removeBindingQuietly(alternateQueueBinding(q, main, alternate), q.getName());
+            rabbitAdmin.deleteQueue(q.getName());
+        }
+        rabbitAdmin.deleteExchange(scenario.getExchangeName());
+        rabbitAdmin.deleteExchange(scenario.getSecondaryExchangeName());
+
+        log.info("Escenario {} (ALTERNATE_EXCHANGE) eliminado por completo", scenario.getId());
+    }
+
+    private Binding alternateQueueBinding(QueueConfig q, DirectExchange main, FanoutExchange alternate) {
+        Queue queue = new Queue(q.getName(), true);
+        if (q.getBoundExchange() == BoundExchange.SECONDARY) {
+            return BindingBuilder.bind(queue).to(alternate);
+        }
+        return BindingBuilder.bind(queue).to(main).with(nullToEmpty(q.getBindingKey()));
     }
 
     private Binding buildHeadersBinding(Scenario scenario, QueueConfig q, Queue queue) {

@@ -162,34 +162,37 @@
   }
 }
 
-/* ---------- Binding puente (Exchange <-> Exchange) ---------- */
+/* ---------- Conector entre dos exchanges (puente de Exchange<->Exchange,
+   reenvío de Alternate Exchange) — usa var(--accent), fijado por cada
+   canvas en su wrapper, para que cada módulo se vea con su propio color
+   en vez de compartir un color hardcodeado. ---------- */
 
-.topology-edge.edge-bridge {
-  stroke: var(--color-bridge);
+.topology-edge.edge-connector {
+  stroke: var(--accent, var(--color-primary));
   stroke-width: 2.5;
   stroke-dasharray: 6 5;
   opacity: 0.55;
 }
 
-.topology-edge.edge-bridge.edge-flowing {
+.topology-edge.edge-connector.edge-flowing {
   opacity: 1;
   stroke-dasharray: 10 6;
 }
 
-.packet-dot.packet-bridge {
-  fill: var(--color-bridge);
-  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--color-bridge) 65%, transparent));
+.packet-dot.packet-connector {
+  fill: var(--accent, var(--color-primary));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent, var(--color-primary)) 65%, transparent));
 }
 
-.bridge-label {
+.connector-label {
   position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: var(--color-bridge-soft);
-  color: var(--color-bridge);
-  border: 1px solid color-mix(in srgb, var(--color-bridge) 35%, transparent);
+  background: color-mix(in srgb, var(--accent, var(--color-primary)) 16%, var(--color-surface));
+  color: var(--accent, var(--color-primary));
+  border: 1px solid color-mix(in srgb, var(--accent, var(--color-primary)) 35%, transparent);
   font-size: 11.5px;
   font-weight: 700;
   padding: 0 10px;

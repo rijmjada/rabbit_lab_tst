@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: "/headers", label: "Headers", icon: "🏷️", color: MODULE_ACCENTS.headers },
   { to: "/default", label: "Default Exchange", icon: "📦", color: MODULE_ACCENTS.default },
   { to: "/exchange-to-exchange", label: "Exchange ↔ Exchange", icon: "🔗", color: MODULE_ACCENTS.bridge },
+  { to: "/alternate-exchange", label: "Alternate Exchange", icon: "🛟", color: MODULE_ACCENTS.alternate },
 ];
 
 const SIDEBAR_STORAGE_KEY = "rabbitmq-playground:sidebar-collapsed";

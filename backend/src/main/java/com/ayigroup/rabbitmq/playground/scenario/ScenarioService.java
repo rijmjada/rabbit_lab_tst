@@ -31,7 +31,8 @@ public class ScenarioService {
         String exchangeName = type == ExchangeType.DEFAULT
                 ? ""
                 : "edu.%s.%s.main".formatted(sessionId, typeSlug);
-        String secondaryExchangeName = type == ExchangeType.EXCHANGE_TO_EXCHANGE
+        boolean hasSecondaryExchange = type == ExchangeType.EXCHANGE_TO_EXCHANGE || type == ExchangeType.ALTERNATE_EXCHANGE;
+        String secondaryExchangeName = hasSecondaryExchange
                 ? "edu.%s.%s.exchange2".formatted(sessionId, typeSlug)
                 : null;
 
@@ -152,11 +153,15 @@ public class ScenarioService {
 
     /**
      * Segmento usado en los nombres reales de RabbitMQ (edu.<sesión>.<slug>...).
-     * Para EXCHANGE_TO_EXCHANGE se usa un slug corto ("bridge") en vez del
+     * EXCHANGE_TO_EXCHANGE y ALTERNATE_EXCHANGE usan un slug corto en vez del
      * nombre completo del enum, para que el nombre no quede innecesariamente
      * largo en la UI.
      */
     private String typeSlug(ExchangeType type) {
-        return type == ExchangeType.EXCHANGE_TO_EXCHANGE ? "bridge" : type.name().toLowerCase();
+        return switch (type) {
+            case EXCHANGE_TO_EXCHANGE -> "bridge";
+            case ALTERNATE_EXCHANGE -> "alt";
+            default -> type.name().toLowerCase();
+        };
     }
 }
