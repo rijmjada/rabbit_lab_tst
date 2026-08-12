@@ -5,7 +5,8 @@ export type ExchangeType =
   | "HEADERS"
   | "DEFAULT"
   | "EXCHANGE_TO_EXCHANGE"
-  | "ALTERNATE_EXCHANGE";
+  | "ALTERNATE_EXCHANGE"
+  | "DEAD_LETTER_EXCHANGE";
 
 export type AckMode = "AUTO" | "MANUAL";
 
@@ -50,10 +51,12 @@ export interface PublishMessageRequest {
   routingKey?: string;
   headers?: Record<string, string>;
   targetQueue?: string;
-  /** Solo para EXCHANGE_TO_EXCHANGE / ALTERNATE_EXCHANGE: a cuál de los dos exchanges se publica. */
+  /** Solo para EXCHANGE_TO_EXCHANGE / ALTERNATE_EXCHANGE / DEAD_LETTER_EXCHANGE: a cuál de los dos exchanges se publica. */
   targetExchange?: BoundExchange;
   mandatory?: boolean;
   persistent?: boolean;
+  /** Solo para DEAD_LETTER_EXCHANGE: si el consumidor debe rechazar el mensaje (simula un fallo de procesamiento). */
+  simulateFailure?: boolean;
 }
 
 export interface PublishMessageResponse {

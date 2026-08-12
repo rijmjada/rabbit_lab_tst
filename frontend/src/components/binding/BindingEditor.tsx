@@ -30,7 +30,7 @@ function toEditable(q: QueueConfig): EditableQueue {
 }
 
 interface BindingEditorProps {
-  variant: "direct" | "topic" | "headers" | "exchange-bridge" | "alternate-exchange";
+  variant: "direct" | "topic" | "headers" | "exchange-bridge" | "alternate-exchange" | "dead-letter";
   queues: QueueConfig[];
   resetKey: string;
   onSave: (updated: QueueConfig[], bridgeBindingKey?: string) => Promise<void> | void;
@@ -80,7 +80,7 @@ export function BindingEditor({ variant, queues, resetKey, onSave, bridgeBinding
       const updated: QueueConfig[] = rows.map((r) => ({
         name: r.name,
         label: r.label,
-        bindingKey: variant === "direct" || variant === "alternate-exchange" ? r.bindingKey : undefined,
+        bindingKey: variant === "direct" || variant === "alternate-exchange" || variant === "dead-letter" ? r.bindingKey : undefined,
         pattern: variant === "topic" || variant === "exchange-bridge" ? r.pattern : undefined,
         xMatch: variant === "headers" ? r.xMatch : undefined,
         headers:
@@ -213,6 +213,51 @@ export function BindingEditor({ variant, queues, resetKey, onSave, bridgeBinding
                 <span className="hint">
                   Recibe automáticamente todo mensaje que no matcheó ninguna binding key de arriba (fanout: sin
                   binding key propia, no es editable).
+                </span>
+              </div>
+            ))}
+        </div>
+      )}
+
+      {variant === "dead-letter" && (
+        <div className="stack">
+          <table className="binding-table">
+            <thead>
+              <tr>
+                <th>Cola (exchange principal)</th>
+                <th>Binding Key</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows
+                .filter((r) => (r.boundExchange ?? "PRIMARY") === "PRIMARY")
+                .map((r) => (
+                  <tr key={r.name}>
+                    <td>{r.label}</td>
+                    <td>
+                      <input
+                        type="text"
+                        value={r.bindingKey}
+                        onChange={(e) => updateField(r.name, "bindingKey", e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+
+          {rows
+            .filter((r) => r.boundExchange === "SECONDARY")
+            .map((r) => (
+              <div className="binding-group" key={r.name}>
+                <div className="binding-group-head">
+                  <strong>{r.label}</strong>
+                  <span className="hint">dead letter queue</span>
+                </div>
+                <span className="hint">
+                  Recibe automáticamente todo mensaje que la cola de arriba rechace (o cuyo TTL expire, o que
+                  desborde un límite de tamaño) — nunca por routing directo (fanout: sin binding key propia, no es
+                  editable).
                 </span>
               </div>
             ))}

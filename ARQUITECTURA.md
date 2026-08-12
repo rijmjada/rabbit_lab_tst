@@ -252,10 +252,10 @@ Ese es **el** destination STOMP: un topic por escenario. El frontend se suscribe
 |---|---|---|
 | `MESSAGE_PUBLISHED` | Justo al recibir el `POST` de publish | `payload`, `routingKey`, `headers` |
 | `ROUTING_EVALUATED` | 350ms después | `routingResult: List<RoutingDecision>` |
-| `MESSAGE_DELIVERED` | Cuando el consumer real recibe el mensaje | `queueName`, `queueLabel` |
+| `MESSAGE_DELIVERED` | Cuando el consumer real recibe el mensaje | `queueName`, `queueLabel`, `reason` (motivo de `x-death` si es una redelivery por dead-letter; `null` en la entrega normal) |
 | `MESSAGE_ACKED` | Cuando el consumer real confirma | `queueName`, `queueLabel` |
 | `MESSAGE_RETURNED` | Cuando el broker devuelve un mensaje sin enrutar | `reason` |
-| `MESSAGE_REJECTED` | *(declarado, nunca emitido — ver sección 7)* | `queueName`, `queueLabel` |
+| `MESSAGE_REJECTED` | Cuando el consumer real rechaza el mensaje (`basicNack`, solo en el módulo Dead Letter Exchange — ver sección 13) | `queueName`, `queueLabel`, `reason` |
 
 El endpoint de conexión (`/ws`, con SockJS de fallback) solo acepta *suscripciones* del cliente — hay un prefijo `/app` configurado para que el cliente pudiera enviar mensajes STOMP al servidor, pero no hay ningún `@MessageMapping` implementado, así que ese canal no se usa: toda escritura pasa por REST.
 
@@ -343,7 +343,7 @@ Está comentado explícitamente en `main.tsx`: esta app crea infraestructura rea
 
 - **`useScenario(type)`**: dueño del ciclo de vida completo de un escenario para una pantalla. Al montar, intenta reusar el escenario cacheado para ese tipo (`scenarioCache`, `Map` en memoria de módulo — sobrevive a re-renders pero no a un refresh de página) llamando `GET /api/scenarios/{id}`; si no existe o falló, crea uno nuevo. Expone `{ scenario, loading, error, create, reset, remove, updateBindings }` — cada feature-screen simplemente consume esto sin preocuparse por las llamadas HTTP.
 - **`useScenarioSocket(scenarioId, onEvent)`**: la capa fina sobre `ws.ts` para components de React. Usa un `useRef` para guardar la versión más reciente del callback sin tener que forzar a quien lo llama a memoizarlo con `useCallback` — solo la suscripción real (ligada a `scenarioId`) se recrea cuando cambia el escenario.
-- **`useMessageHistory(scenarioId)`**: carga el historial inicial por REST y después lo mantiene actualizado escuchando eventos (agrega un registro nuevo en `MESSAGE_PUBLISHED`, y va completando `routingResult`/`deliveries`/`unrouted` en los eventos siguientes que llegan para ese `messageId`). Nota: si el backend algún día emitiera `MESSAGE_REJECTED`, este hook ya sabe manejarlo (`case "MESSAGE_REJECTED"`) — está listo del lado del frontend aunque el backend no lo dispare todavía.
+- **`useMessageHistory(scenarioId)`**: carga el historial inicial por REST y después lo mantiene actualizado escuchando eventos (agrega un registro nuevo en `MESSAGE_PUBLISHED`, y va completando `routingResult`/`deliveries`/`unrouted` en los eventos siguientes que llegan para ese `messageId`). Maneja `MESSAGE_REJECTED` (`case "MESSAGE_REJECTED"`) igual que `MESSAGE_ACKED` — hoy el único emisor real es el módulo Dead Letter Exchange (sección 13), pero el hook no depende de ningún tipo de escenario en particular.
 - **`useTopologyAnimation(scenarioId, queues)`**: el traductor entre "eventos crudos de WebSocket" y "qué debe brillar y cuándo en el diagrama". Mantiene, por cola, contadores (`flowTick`, `rejectTick`, `deliverTick`, `ackTick`) que se incrementan en cada evento relevante — esos contadores son la clave de cómo se re-disparan las animaciones (ver sección 6.5): en vez de depender de que una clase CSS cambie de valor (que no alcanza si dos mensajes consecutivos caen en el mismo estado), cada evento nuevo incrementa un número, y ese número se usa como parte de la `key` de React de un elemento — forzando que React lo desmonte y remonte, lo cual reinicia cualquier animación CSS asociada.
 
 ### 6.4. `components/` — piezas reusadas por las 5 pantallas de exchange
@@ -467,13 +467,12 @@ Si en cambio fuera Direct/Topic/Headers y el mensaje **no** matcheara ninguna co
 
 Para no generar una imagen más prolija de la que hay — esto es exactamente lo que encontré revisando el código fuente, no una lista aspiracional:
 
-1. **Rechazo de mensajes (`basicNack`/`basicReject`) no está cableado.** `EventType.MESSAGE_REJECTED`, `MessageHistoryService.markRejected()` y `MessageRecord.DeliveryStatus.REJECTED` existen como tipos/métodos, y el frontend ya sabe reaccionar a ese evento (`useMessageHistory.ts`), pero ningún consumer llama a esos métodos — hoy, todo consumer confirma siempre con éxito.
-2. **Publisher confirms configurados pero no usados.** `application.yml` tiene `publisher-confirm-type: correlated`, pero no hay ningún `ConfirmCallback`/`CorrelationData` registrado en el código — solo se usa el mecanismo de *returns*.
-3. **El canal de escritura STOMP cliente→servidor no existe.** El prefijo `/app` está configurado pero sin ningún `@MessageMapping` — toda escritura es HTTP REST.
-4. **Sin Bean Validation activa.** La dependencia `spring-boot-starter-validation` está en el `pom.xml`, pero no hay `@Valid`/`@NotNull` en los DTOs ni controllers.
-5. **Sin persistencia.** Escenarios e historial viven en memoria del proceso backend — un restart los pierde a todos (y, como se explicó en la sección 4, deja huérfanos los recursos ya declarados en RabbitMQ).
-6. **Sin autenticación.** Ni los endpoints REST ni el handshake WebSocket requieren credenciales — cualquiera con acceso a la red puede crear/borrar escenarios.
-7. **El flag `mandatory` del request es informativo.** El request de publish acepta `mandatory: boolean`, y se guarda en el historial, pero el flag AMQP real siempre es `true` (fijado permanentemente en el bean `RabbitTemplate`) sin importar lo que mande el cliente.
+1. **Publisher confirms configurados pero no usados.** `application.yml` tiene `publisher-confirm-type: correlated`, pero no hay ningún `ConfirmCallback`/`CorrelationData` registrado en el código — solo se usa el mecanismo de *returns*.
+2. **El canal de escritura STOMP cliente→servidor no existe.** El prefijo `/app` está configurado pero sin ningún `@MessageMapping` — toda escritura es HTTP REST.
+3. **Sin Bean Validation activa.** La dependencia `spring-boot-starter-validation` está en el `pom.xml`, pero no hay `@Valid`/`@NotNull` en los DTOs ni controllers.
+4. **Sin persistencia.** Escenarios e historial viven en memoria del proceso backend — un restart los pierde a todos (y, como se explicó en la sección 4, deja huérfanos los recursos ya declarados en RabbitMQ).
+5. **Sin autenticación.** Ni los endpoints REST ni el handshake WebSocket requieren credenciales — cualquiera con acceso a la red puede crear/borrar escenarios.
+6. **El flag `mandatory` del request es informativo.** El request de publish acepta `mandatory: boolean`, y se guarda en el historial, pero el flag AMQP real siempre es `true` (fijado permanentemente en el bean `RabbitTemplate`) sin importar lo que mande el cliente.
 
 ---
 
@@ -623,6 +622,84 @@ Se reimplementó el mismo patrón que `ExchangeBridgeCanvas`/`useExchangeBridgeA
 
 ---
 
-## 13. Cómo correr todo
+## 13. El módulo "Dead Letter Exchange": reenvío automático de lo rechazado
+
+Tercer patrón, y el que más contrasta con los dos anteriores. En "Exchange → Exchange" un binding reenvía lo que **matchea** un patrón; en "Alternate Exchange" el reenvío se dispara cuando **nada matchea**. Acá el disparador no tiene nada que ver con el routing: una cola puede declarar un dead letter exchange (`x-dead-letter-exchange`), y RabbitMQ reenvía ahí, automáticamente, todo mensaje que esa cola **rechace explícitamente** (`basic.nack`/`basic.reject` sin requeue) — o, en otros escenarios no cubiertos interactivamente por esta demo, cuyo TTL expire o que desborde un límite de tamaño (`x-max-length`). El punto pedagógico central: el **routing sí funcionó** — el mensaje llegó bien a la cola — y el reenvío ocurre *después*, como consecuencia de un evento de entrega a nivel de cola, no de una decisión del exchange.
+
+Verificado contra un RabbitMQ real durante el desarrollo: la UI de management muestra el `arguments` de la cola principal con `"x-dead-letter-exchange": "<nombre del DLX>"`, y un mensaje rechazado a propósito reaparece con ACK real en la cola del DLX, con el `messageId` original preservado (RabbitMQ mantiene las propiedades del mensaje, incluido el `correlationId`, al dead-letterarlo) — lo que permite que el historial de mensajes correlacione ambas entregas como el mismo mensaje.
+
+### 13.1. Por qué el disparador interactivo es el rechazo manual, no TTL
+
+`DynamicConsumerManager` arranca un consumer activo por cola apenas se crea el escenario, y ese consumer confirma (o, ahora, rechaza) cada mensaje en 250-900ms. Con consumers siempre activos, un TTL de cola nunca llegaría a expirar en una demo en vivo — el mensaje se consume antes. Por eso el único disparador interactivo de este módulo es un checkbox en el composer ("Simular fallo de procesamiento") que agrega un header AMQP (`x-edu-simulate-reject`) al mensaje publicado; TTL y `x-max-length` se explican en prosa (`ExplanationPanel`) como los otros dos disparadores reales de RabbitMQ, sin demostrarlos interactivamente — mismo criterio de alcance que el resto de los módulos.
+
+### 13.2. Modelo y nombres reales en RabbitMQ
+
+- Reusa `secondaryExchangeName` (acá, el DLX) y el enum `BoundExchange` (`PRIMARY`/`SECONDARY`) tal cual, sin ningún campo nuevo en `Scenario` — mismo criterio que `ALTERNATE_EXCHANGE`: no hay ningún "binding key del puente" que editar, la relación es un argumento fijo de la cola principal.
+- `PublishMessageRequest` gana `simulateFailure: boolean` (default `false`) — el único campo nuevo de todo el módulo del lado del request.
+- Nombres reales: `ScenarioService.typeSlug()` mapea este tipo al slug corto `"dlx"`. Resultado: `edu.<sesión>.dlx.main` (principal, Direct), `edu.<sesión>.dlx.exchange2` (el DLX, Fanout), `edu.<sesión>.dlx.<slug-cola>` por cada cola.
+- Escenario de demostración por defecto (`ScenarioDefaults`):
+
+```
+Exchange "Pagos" (Direct)
+  └─ Cola "Procesar pago"   bindingKey = "pago.nuevo"
+     con argumento x-dead-letter-exchange -> el Fanout de abajo
+
+Exchange "Pagos.dlx" (Fanout, el DLX)
+  └─ Cola "Pagos fallidos"  (dead letter queue, fanout, sin binding key)
+```
+
+### 13.3. Declarar el dead letter exchange de verdad (`TopologyManager`)
+
+Igual que con `alternate-exchange`, Spring AMQP tiene soporte de primera clase: `QueueBuilder` expone un método dedicado `deadLetterExchange(String)` (confirmado con `javap` contra el jar real del proyecto), evitando declarar el argumento a mano con `withArgument("x-dead-letter-exchange", ...)`:
+
+```java
+Queue procesarPago = QueueBuilder.durable(scenario.getQueues().get(0).getName())
+        .deadLetterExchange(scenario.getSecondaryExchangeName())
+        .build();
+```
+
+`declareDeadLetterExchange` declara primero el Fanout (DLX) y después el Direct principal con sus colas — la cola `PRIMARY` se construye con este `QueueBuilder` especial, la cola `SECONDARY` (la dead letter queue) se declara como una cola común. `rebindDeadLetterExchange` es tan simple como el de `alternate-exchange`: no hay ningún argumento que reconfigurar, solo re-bindear colas si cambia la `bindingKey` de la cola principal.
+
+### 13.4. Routing explicado (`DeadLetterRoutingEvaluator`)
+
+El más simple de los tres evaluadores custom (mismo motivo que los otros dos para no implementar `RoutingEvaluator`: necesita `BoundExchange target`). A diferencia de `ExchangeToExchangeRoutingEvaluator` y `AlternateExchangeRoutingEvaluator`, acá **no hay ninguna lógica de "cruce" ligada a la routing key**: el dead lettering no es una decisión de routing en absoluto.
+
+- Si se publica directo en el DLX, se comporta como un Fanout puro.
+- Si se publica en el principal: match exacto por `bindingKey` para "Procesar pago" (igual que `DirectRoutingEvaluator`); la cola del DLX **nunca** matchea por routing directo — su `reason` aclara explícitamente que solo recibe un mensaje si la cola principal lo rechaza (evento aparte, evaluado en `DynamicConsumerManager`, no acá).
+
+Verificado con los 3 casos de la demo:
+
+| Se publica en | Routing key / flag | Resultado real (verificado) |
+|---|---|---|
+| Principal | `pago.nuevo`, sin el checkbox | Matchea "Procesar pago" → ACK real, nunca toca el DLX |
+| Principal | `pago.nuevo`, con "simular fallo" tildado | Matchea "Procesar pago" (el routing funcionó) → el consumer la rechaza (`basicNack`, sin requeue) → RabbitMQ la reenvía sola al DLX → ACK real en "Pagos fallidos", con el mismo `messageId` correlacionado en el historial y el motivo (`rejected`) tomado del header `x-death` real |
+| DLX (directo) | (cualquiera) | Matchea "Pagos fallidos" directo (fanout), sin pasar por "Procesar pago" |
+
+### 13.5. Simular el rechazo y leerlo de vuelta (`MessagePublisherService`, `DynamicConsumerManager`)
+
+`MessagePublisherService.doPublish()` agrega el header AMQP `x-edu-simulate-reject: true` cuando `request.isSimulateFailure()` — mismo mecanismo que ya usa `HEADER_SCENARIO_ID` para viajar metadata educativa fuera del payload.
+
+`DynamicConsumerManager.handleDelivery()` es donde vive la lógica real:
+
+- Lee el header `x-death` (una lista de mapas que RabbitMQ agrega automáticamente a un mensaje ya dead-letterado) para extraer un `deathReason` humano (`"rejected"`, `"expired"`, `"maxlen"`, según el motivo real). Ese `deathReason` viaja en el evento `MESSAGE_DELIVERED` de esa entrega — es lo que permite, por ejemplo, mostrar "rejected" como motivo real en la cola del DLX en vez de un texto genérico.
+- Solo honra `x-edu-simulate-reject` **si `x-death` está ausente** — es decir, si esta es la primera entrega del mensaje, no una redelivery ya dead-letterada. Sin este chequeo, la propia cola del DLX volvería a rechazar el mismo mensaje reenviado (el header de simulación no se "hereda" ni se limpia solo).
+- Si corresponde rechazar: tras el mismo delay ya existente según `AckMode`, `channel.basicNack(deliveryTag, false, false)` en vez de `basicAck`, `historyService.markRejected(...)` y `eventBroadcaster.broadcast(..., MessageEventDto.rejected(...))`. Esto termina de cablear `EventType.MESSAGE_REJECTED`, `MessageHistoryService.markRejected()` y `MessageRecord.DeliveryStatus.REJECTED` — que existían como scaffolding sin usar desde antes de este módulo (ver sección 10, que hasta esta versión documentaba esto como limitación conocida).
+
+### 13.6. Frontend: el hook más simple de los tres módulos de "dos exchanges"
+
+`useDeadLetterAnimation` reimplementa el mismo patrón que `useExchangeBridgeAnimation`/`useAlternateExchangeAnimation`, pero es el más simple: no necesita el truco de "separar decisiones locales de decisiones de fallback y aplicarlas con un delay artificial" que usan los otros dos, porque el cruce hacia la cola del DLX **no es una decisión de routing simulada** — es la secuencia real de eventos que ya emite el backend (`MESSAGE_REJECTED` en la cola principal, y más tarde un `MESSAGE_DELIVERED`/`MESSAGE_ACKED` real en la cola del DLX), manejada por la misma lógica genérica por-nombre-de-cola que el hook ya necesita para todo lo demás. `ROUTING_EVALUATED` se aplica directo, sin ninguna separación.
+
+- **`DeadLetterCanvas`** reusa el mismo esqueleto de dos bandas que `AlternateExchangeCanvas` (`box()`/`curve()`/`verticalCurve()`, clases `.edge-connector`/`.packet-connector`/`.connector-label` ya generalizadas), con una diferencia de layout deliberada: el conector arranca en la **cola** "Procesar pago" (no en el exchange principal) y termina en el exchange del DLX — refuerza visualmente que el disparador es un evento de la cola, no del exchange. Usa `--module-dlx` (rosa/carmesí, distinto de `--color-danger` para no confundir "rechazado" semántico con el color del módulo) como `--accent`.
+- Nuevo modificador CSS `.topology-node.node-consumer.node-rejected` (rojo, mismo criterio que `.node-acked` pero con `--color-danger`/`--color-danger-soft`) para el estado "Rechazado ✗" del consumer.
+- **`BindingEditor`** gana una sexta variante (`"dead-letter"`): misma estructura que `"alternate-exchange"` (tabla editable para la cola principal, línea informativa no editable para la dead letter queue).
+- **`MessageComposer`** gana `showSimulateFailure` (checkbox "Simular fallo de procesamiento (rechazar)"), incluido en `onSend(...)` como `simulateFailure`.
+
+### 13.7. La home y el sidebar: separar "tipos de exchange" de "patrones y arquitecturas"
+
+Con tres módulos de este segundo tipo, se volvía confuso mostrarlos en la misma grilla plana que los cinco tipos base — parecía un 6to/7mo/8vo tipo de exchange en vez de una combinación de los tipos base. `HomeScreen.tsx` y `Shell.tsx` agrupan ahora las secciones en dos bloques con título propio ("Tipos de Exchange" / "Patrones y arquitecturas"), sin ningún cambio de lógica de routing o de datos — es puramente una reorganización visual de arrays ya existentes.
+
+---
+
+## 14. Cómo correr todo
 
 Ver `README.md` para el paso a paso completo. Como referencia rápida: RabbitMQ vía `docker compose up -d`, backend con `mvn spring-boot:run` (puerto 8080), frontend con `npm run dev` (puerto 5173). Hay un script `start.ps1` en la raíz del repo que automatiza las tres cosas en orden, esperando a que cada una esté lista antes de seguir con la siguiente (`./start.ps1` para levantar todo, `./start.ps1 -Stop` para bajarlo).

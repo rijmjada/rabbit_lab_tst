@@ -1,7 +1,15 @@
 import { Link } from "react-router-dom";
 import { MODULE_ACCENTS } from "../../lib/moduleColors";
 
-const SECTIONS = [
+interface HomeSection {
+  to: string;
+  title: string;
+  desc: string;
+  icon: string;
+  color: string;
+}
+
+const EXCHANGE_TYPES: HomeSection[] = [
   {
     to: "/fanout",
     title: "Fanout",
@@ -37,6 +45,13 @@ const SECTIONS = [
     icon: "📦",
     color: MODULE_ACCENTS.default,
   },
+];
+
+// A diferencia de los tipos de arriba, estos no son "más tipos de exchange":
+// son patrones que combinan los tipos base para resolver un problema distinto
+// (reenvío entre exchanges, fallback, mensajes rechazados). Se muestran en su
+// propio grupo para no confundirlos con un 6to/7mo tipo de exchange.
+const PATTERNS: HomeSection[] = [
   {
     to: "/exchange-to-exchange",
     title: "Exchange ↔ Exchange",
@@ -51,7 +66,36 @@ const SECTIONS = [
     icon: "🛟",
     color: MODULE_ACCENTS.alternate,
   },
+  {
+    to: "/dead-letter",
+    title: "Dead Letter Exchange",
+    desc: "Una cola con un exchange de \"cartas muertas\": lo que se rechaza, expira o desborda se reenvía solo, para inspeccionar después.",
+    icon: "💀",
+    color: MODULE_ACCENTS.dlx,
+  },
 ];
+
+function SectionGrid({ title, sections }: { title: string; sections: HomeSection[] }) {
+  return (
+    <div className="home-section">
+      <div className="section-title">{title}</div>
+      <div className="home-grid">
+        {sections.map((s) => (
+          <Link
+            key={s.to}
+            to={s.to}
+            className="card home-card"
+            style={{ "--home-accent": s.color } as React.CSSProperties}
+          >
+            <div className="home-card-icon">{s.icon}</div>
+            <h3>{s.title}</h3>
+            <p>{s.desc}</p>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function HomeScreen() {
   return (
@@ -66,20 +110,8 @@ export function HomeScreen() {
           </p>
         </div>
       </div>
-      <div className="home-grid">
-        {SECTIONS.map((s) => (
-          <Link
-            key={s.to}
-            to={s.to}
-            className="card home-card"
-            style={{ "--home-accent": s.color } as React.CSSProperties}
-          >
-            <div className="home-card-icon">{s.icon}</div>
-            <h3>{s.title}</h3>
-            <p>{s.desc}</p>
-          </Link>
-        ))}
-      </div>
+      <SectionGrid title="Tipos de Exchange" sections={EXCHANGE_TYPES} />
+      <SectionGrid title="Patrones y arquitecturas" sections={PATTERNS} />
     </div>
   );
 }

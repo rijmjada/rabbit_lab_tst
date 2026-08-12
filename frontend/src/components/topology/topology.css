@@ -56,6 +56,12 @@
   animation: node-pop 0.4s var(--ease-spring);
 }
 
+.topology-node.node-consumer.node-rejected {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  animation: node-pop 0.4s var(--ease-spring);
+}
+
 @keyframes node-pop {
   0% {
     transform: scale(0.92);

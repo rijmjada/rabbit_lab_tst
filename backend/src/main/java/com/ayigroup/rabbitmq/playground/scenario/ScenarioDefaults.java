@@ -86,6 +86,17 @@ public final class ScenarioDefaults {
                             .boundExchange(BoundExchange.SECONDARY)
                             .build()
             );
+            case DEAD_LETTER_EXCHANGE -> List.of(
+                    QueueConfig.builder()
+                            .label("Procesar pago")
+                            .bindingKey("pago.nuevo")
+                            .boundExchange(BoundExchange.PRIMARY)
+                            .build(),
+                    QueueConfig.builder()
+                            .label("Pagos fallidos")
+                            .boundExchange(BoundExchange.SECONDARY)
+                            .build()
+            );
         };
     }
 

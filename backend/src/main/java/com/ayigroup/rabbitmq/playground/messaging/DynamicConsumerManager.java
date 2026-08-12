@@ -37,6 +37,8 @@ public class DynamicConsumerManager {
 
     private static final long AUTO_ACK_DELAY_MS = 250;
     private static final long MANUAL_ACK_DELAY_MS = 900;
+    private static final String HEADER_SIMULATE_REJECT = "x-edu-simulate-reject";
+    private static final String HEADER_DEATH = "x-death";
 
     private final ConnectionFactory connectionFactory;
     private final EventBroadcaster eventBroadcaster;
@@ -84,10 +86,25 @@ public class DynamicConsumerManager {
             return;
         }
 
+        String deathReason = extractDeathReason(message);
         historyService.markDelivered(scenarioId, messageId, queueName);
-        eventBroadcaster.broadcast(scenarioId, MessageEventDto.delivered(scenarioId, messageId, queueName, queueLabel));
+        eventBroadcaster.broadcast(scenarioId, MessageEventDto.delivered(scenarioId, messageId, queueName, queueLabel, deathReason));
 
+        // Solo se honra el rechazo simulado en la primera entrega: si el mensaje ya viene con
+        // x-death (o sea, ya fue dead-letterado una vez), la cola del DLX no debe volver a rechazarlo.
+        boolean simulateReject = deathReason == null && isSimulateRejectHeaderPresent(message);
         long delay = queueConfig.getAckMode() == AckMode.MANUAL ? MANUAL_ACK_DELAY_MS : AUTO_ACK_DELAY_MS;
+
+        if (simulateReject) {
+            eventScheduler.schedule(() -> {
+                nackQuietly(channel, deliveryTag);
+                historyService.markRejected(scenarioId, messageId, queueName);
+                eventBroadcaster.broadcast(scenarioId, MessageEventDto.rejected(scenarioId, messageId, queueName, queueLabel,
+                        "Rechazado manualmente (simulación de fallo de procesamiento)."));
+            }, delay, TimeUnit.MILLISECONDS);
+            return;
+        }
+
         eventScheduler.schedule(() -> {
             ackQuietly(channel, deliveryTag);
             historyService.markAcked(scenarioId, messageId, queueName);
@@ -95,11 +112,34 @@ public class DynamicConsumerManager {
         }, delay, TimeUnit.MILLISECONDS);
     }
 
+    /** El header `x-death`, si existe, es una lista de mapas puesta por RabbitMQ; el primero es el evento de dead-letter más reciente. */
+    private String extractDeathReason(Message message) {
+        Object xDeath = message.getMessageProperties().getHeaders().get(HEADER_DEATH);
+        if (xDeath instanceof List<?> deaths && !deaths.isEmpty() && deaths.get(0) instanceof Map<?, ?> latest) {
+            Object reason = latest.get("reason");
+            return reason == null ? null : reason.toString();
+        }
+        return null;
+    }
+
+    private boolean isSimulateRejectHeaderPresent(Message message) {
+        Object flag = message.getMessageProperties().getHeaders().get(HEADER_SIMULATE_REJECT);
+        return Boolean.TRUE.equals(flag) || "true".equalsIgnoreCase(String.valueOf(flag));
+    }
+
     private void ackQuietly(Channel channel, long deliveryTag) {
         try {
             channel.basicAck(deliveryTag, false);
         } catch (IOException e) {
             log.warn("No se pudo confirmar (ACK) el mensaje con deliveryTag {}: {}", deliveryTag, e.getMessage());
+        }
+    }
+
+    private void nackQuietly(Channel channel, long deliveryTag) {
+        try {
+            channel.basicNack(deliveryTag, false, false);
+        } catch (IOException e) {
+            log.warn("No se pudo rechazar (NACK) el mensaje con deliveryTag {}: {}", deliveryTag, e.getMessage());
         }
     }
 }

@@ -8,6 +8,7 @@ import { HeadersScreen } from "./features/headers/HeadersScreen";
 import { DefaultScreen } from "./features/default/DefaultScreen";
 import { ExchangeToExchangeScreen } from "./features/exchange-to-exchange/ExchangeToExchangeScreen";
 import { AlternateExchangeScreen } from "./features/alternate-exchange/AlternateExchangeScreen";
+import { DeadLetterScreen } from "./features/dead-letter/DeadLetterScreen";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/default" element={<DefaultScreen />} />
           <Route path="/exchange-to-exchange" element={<ExchangeToExchangeScreen />} />
           <Route path="/alternate-exchange" element={<AlternateExchangeScreen />} />
+          <Route path="/dead-letter" element={<DeadLetterScreen />} />
         </Route>
       </Routes>
     </BrowserRouter>

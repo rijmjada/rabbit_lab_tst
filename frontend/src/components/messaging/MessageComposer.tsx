@@ -11,6 +11,7 @@ export interface ComposerSubmitData {
   headers?: Record<string, string>;
   targetQueue?: string;
   targetExchange?: string;
+  simulateFailure?: boolean;
 }
 
 interface MessageComposerProps {
@@ -26,6 +27,8 @@ interface MessageComposerProps {
   targetExchangeOptions?: ComposerOption[];
   defaultPayload?: string;
   disabled?: boolean;
+  /** Solo para DEAD_LETTER_EXCHANGE: checkbox para que el consumidor rechace el mensaje a propósito. */
+  showSimulateFailure?: boolean;
 }
 
 /**
@@ -57,9 +60,11 @@ export function MessageComposer({
   targetExchangeOptions,
   defaultPayload = '{\n  "mensaje": "Pedido creado",\n  "cliente": "ABC"\n}',
   disabled = false,
+  showSimulateFailure = false,
 }: MessageComposerProps) {
   const [payloadText, setPayloadText] = useState(defaultPayload);
   const [routingKey, setRoutingKey] = useState("");
+  const [simulateFailure, setSimulateFailure] = useState(false);
   const [targetQueue, setTargetQueue] = useSyncedSelection(targetQueueOptions);
   const [targetExchange, setTargetExchange] = useSyncedSelection(targetExchangeOptions?.map((o) => o.value));
   const [headerRows, setHeaderRows] = useState<Array<{ key: string; value: string }>>(
@@ -105,6 +110,7 @@ export function MessageComposer({
         headers: showHeaders ? headers : undefined,
         targetQueue: targetQueueOptions ? targetQueue : undefined,
         targetExchange: targetExchangeOptions ? targetExchange : undefined,
+        simulateFailure: showSimulateFailure ? simulateFailure : undefined,
       });
     } finally {
       setSending(false);
@@ -192,6 +198,23 @@ export function MessageComposer({
           <button type="button" className="btn btn-add" onClick={addHeaderRow} style={{ alignSelf: "flex-start" }}>
             + Agregar cabecera
           </button>
+        </div>
+      )}
+
+      {showSimulateFailure && (
+        <div className="field field-checkbox">
+          <label>
+            <input
+              type="checkbox"
+              checked={simulateFailure}
+              onChange={(e) => setSimulateFailure(e.target.checked)}
+            />
+            Simular fallo de procesamiento (rechazar)
+          </label>
+          <span className="hint">
+            El consumidor rechazará el mensaje (basic.nack, sin requeue) en vez de confirmarlo, disparando el
+            dead lettering real hacia el DLX.
+          </span>
         </div>
       )}
 

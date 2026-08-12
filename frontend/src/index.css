@@ -53,6 +53,9 @@
   --module-headers: #0d9488;
   --module-default: #475569;
   --module-alternate: #4f46e5;
+  /* Distinto de --color-danger (que marca "rechazado" en cualquier lado de
+     la app): este es el color de identidad del módulo, no un semántico. */
+  --module-dlx: #9f1239;
   /* El productor siempre usa este acento fijo (cyan), independiente del
      módulo — así se distingue claramente de la caja del exchange, que sí
      usa el color de identidad de cada módulo. */
@@ -110,6 +113,7 @@
   --module-headers: #2dd4bf;
   --module-default: #94a3b8;
   --module-alternate: #818cf8;
+  --module-dlx: #fb7185;
   --color-node-producer: #22d3ee;
 }
 
@@ -320,7 +324,27 @@ code, pre {
 .app-nav {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+
+.app-nav-group {
+  display: flex;
+  flex-direction: column;
   gap: 3px;
+}
+
+.app-nav-group-label {
+  margin: 4px 0 2px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  transition: opacity 0.15s var(--ease-standard);
+}
+
+.app-sidebar.collapsed .app-nav-group-label {
+  display: none;
 }
 
 .app-nav-link {
@@ -656,6 +680,21 @@ code, pre {
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-muted);
+}
+
+.field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.field-checkbox input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
 }
 
 /* Base para todo input/textarea/select de la app, incluso fuera de .field
@@ -1212,6 +1251,10 @@ select:focus {
   padding: 20px;
   text-align: center;
   animation: rise-in 0.3s var(--ease-standard) both;
+}
+
+.home-section + .home-section {
+  margin-top: 36px;
 }
 
 .home-grid {

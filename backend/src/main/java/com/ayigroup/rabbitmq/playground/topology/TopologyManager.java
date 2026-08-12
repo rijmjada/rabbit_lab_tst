@@ -44,6 +44,10 @@ public class TopologyManager {
             declareAlternateExchange(scenario);
             return;
         }
+        if (scenario.getType() == ExchangeType.DEAD_LETTER_EXCHANGE) {
+            declareDeadLetterExchange(scenario);
+            return;
+        }
         if (scenario.getType() != ExchangeType.DEFAULT) {
             Exchange exchange = buildExchange(scenario.getType(), scenario.getExchangeName());
             rabbitAdmin.declareExchange(exchange);
@@ -78,6 +82,10 @@ public class TopologyManager {
             rebindAlternateExchange(scenario, previousQueues);
             return;
         }
+        if (scenario.getType() == ExchangeType.DEAD_LETTER_EXCHANGE) {
+            rebindDeadLetterExchange(scenario, previousQueues);
+            return;
+        }
         for (QueueConfig previous : previousQueues) {
             removeBindingQuietly(scenario, previous);
         }
@@ -98,6 +106,10 @@ public class TopologyManager {
         }
         if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
             deleteAlternateExchange(scenario);
+            return;
+        }
+        if (scenario.getType() == ExchangeType.DEAD_LETTER_EXCHANGE) {
+            deleteDeadLetterExchange(scenario);
             return;
         }
         for (QueueConfig q : scenario.getQueues()) {
@@ -133,6 +145,8 @@ public class TopologyManager {
                     "EXCHANGE_TO_EXCHANGE declara dos exchanges propios, ver declareExchangeToExchange()");
             case ALTERNATE_EXCHANGE -> throw new IllegalStateException(
                     "ALTERNATE_EXCHANGE declara dos exchanges propios, ver declareAlternateExchange()");
+            case DEAD_LETTER_EXCHANGE -> throw new IllegalStateException(
+                    "DEAD_LETTER_EXCHANGE declara dos exchanges propios, ver declareDeadLetterExchange()");
         };
     }
 
@@ -152,6 +166,8 @@ public class TopologyManager {
                     "EXCHANGE_TO_EXCHANGE resuelve el binding de cada cola según boundExchange, ver queueBinding()");
             case ALTERNATE_EXCHANGE -> throw new IllegalStateException(
                     "ALTERNATE_EXCHANGE resuelve el binding de cada cola según boundExchange, ver alternateQueueBinding()");
+            case DEAD_LETTER_EXCHANGE -> throw new IllegalStateException(
+                    "DEAD_LETTER_EXCHANGE resuelve el binding de cada cola según boundExchange, ver deadLetterQueueBinding()");
         };
     }
 
@@ -279,6 +295,71 @@ public class TopologyManager {
             return BindingBuilder.bind(queue).to(alternate);
         }
         return BindingBuilder.bind(queue).to(main).with(nullToEmpty(q.getBindingKey()));
+    }
+
+    // ---------- DEAD_LETTER_EXCHANGE ----------
+
+    private void declareDeadLetterExchange(Scenario scenario) {
+        FanoutExchange dlx = new FanoutExchange(scenario.getSecondaryExchangeName(), true, false);
+        rabbitAdmin.declareExchange(dlx);
+
+        DirectExchange main = new DirectExchange(scenario.getExchangeName(), true, false);
+        rabbitAdmin.declareExchange(main);
+
+        for (QueueConfig q : scenario.getQueues()) {
+            rabbitAdmin.declareQueue(deadLetterAwareQueue(q, scenario.getSecondaryExchangeName()));
+            rabbitAdmin.declareBinding(deadLetterQueueBinding(q, main, dlx));
+        }
+
+        log.info("Escenario {} (DEAD_LETTER_EXCHANGE) declarado: exchange='{}', dlx='{}', colas={}",
+                scenario.getId(), scenario.getExchangeName(), scenario.getSecondaryExchangeName(), scenario.getQueues().size());
+    }
+
+    private void rebindDeadLetterExchange(Scenario scenario, List<QueueConfig> previousQueues) {
+        DirectExchange main = new DirectExchange(scenario.getExchangeName());
+        FanoutExchange dlx = new FanoutExchange(scenario.getSecondaryExchangeName());
+
+        // Igual que en ALTERNATE_EXCHANGE: nada análogo a una key de puente
+        // que remover/recrear — el argumento x-dead-letter-exchange se fija
+        // al declarar la cola y no se vuelve a tocar. Solo se re-bindean colas.
+        for (QueueConfig previous : previousQueues) {
+            removeBindingQuietly(deadLetterQueueBinding(previous, main, dlx), previous.getName());
+        }
+        for (QueueConfig current : scenario.getQueues()) {
+            rabbitAdmin.declareBinding(deadLetterQueueBinding(current, main, dlx));
+        }
+
+        log.info("Escenario {} (DEAD_LETTER_EXCHANGE) re-configurado con nuevos bindings", scenario.getId());
+    }
+
+    private void deleteDeadLetterExchange(Scenario scenario) {
+        DirectExchange main = new DirectExchange(scenario.getExchangeName());
+        FanoutExchange dlx = new FanoutExchange(scenario.getSecondaryExchangeName());
+
+        for (QueueConfig q : scenario.getQueues()) {
+            removeBindingQuietly(deadLetterQueueBinding(q, main, dlx), q.getName());
+            rabbitAdmin.deleteQueue(q.getName());
+        }
+        rabbitAdmin.deleteExchange(scenario.getExchangeName());
+        rabbitAdmin.deleteExchange(scenario.getSecondaryExchangeName());
+
+        log.info("Escenario {} (DEAD_LETTER_EXCHANGE) eliminado por completo", scenario.getId());
+    }
+
+    private Binding deadLetterQueueBinding(QueueConfig q, DirectExchange main, FanoutExchange dlx) {
+        Queue queue = new Queue(q.getName(), true);
+        if (q.getBoundExchange() == BoundExchange.SECONDARY) {
+            return BindingBuilder.bind(queue).to(dlx);
+        }
+        return BindingBuilder.bind(queue).to(main).with(nullToEmpty(q.getBindingKey()));
+    }
+
+    /** Solo la cola PRIMARY (la que puede rechazar mensajes) lleva el argumento x-dead-letter-exchange. */
+    private Queue deadLetterAwareQueue(QueueConfig q, String dlxName) {
+        if (q.getBoundExchange() == BoundExchange.SECONDARY) {
+            return QueueBuilder.durable(q.getName()).build();
+        }
+        return QueueBuilder.durable(q.getName()).deadLetterExchange(dlxName).build();
     }
 
     private Binding buildHeadersBinding(Scenario scenario, QueueConfig q, Queue queue) {

@@ -7,6 +7,7 @@ import com.ayigroup.rabbitmq.playground.events.MessageEventDto;
 import com.ayigroup.rabbitmq.playground.history.MessageHistoryService;
 import com.ayigroup.rabbitmq.playground.history.MessageRecord;
 import com.ayigroup.rabbitmq.playground.routing.AlternateExchangeRoutingEvaluator;
+import com.ayigroup.rabbitmq.playground.routing.DeadLetterRoutingEvaluator;
 import com.ayigroup.rabbitmq.playground.routing.ExchangeToExchangeRoutingEvaluator;
 import com.ayigroup.rabbitmq.playground.routing.RoutingDecision;
 import com.ayigroup.rabbitmq.playground.routing.RoutingEvaluatorFactory;
@@ -52,11 +53,13 @@ public class MessagePublisherService {
     private final RoutingEvaluatorFactory evaluatorFactory;
     private final ExchangeToExchangeRoutingEvaluator exchangeToExchangeEvaluator;
     private final AlternateExchangeRoutingEvaluator alternateExchangeEvaluator;
+    private final DeadLetterRoutingEvaluator deadLetterEvaluator;
     private final EventBroadcaster eventBroadcaster;
     private final MessageHistoryService historyService;
     private final ScheduledExecutorService eventScheduler;
 
     private static final String HEADER_SCENARIO_ID = "x-edu-scenario-id";
+    private static final String HEADER_SIMULATE_REJECT = "x-edu-simulate-reject";
 
     @PostConstruct
     void registerReturnsCallback() {
@@ -124,6 +127,9 @@ public class MessagePublisherService {
         if (scenario.getType() == ExchangeType.ALTERNATE_EXCHANGE) {
             return alternateExchangeEvaluator.evaluate(scenario, resolveTargetExchange(request), displayRoutingKey);
         }
+        if (scenario.getType() == ExchangeType.DEAD_LETTER_EXCHANGE) {
+            return deadLetterEvaluator.evaluate(scenario, resolveTargetExchange(request), displayRoutingKey);
+        }
         return evaluatorFactory.forType(scenario.getType()).evaluate(scenario, displayRoutingKey, request.getHeaders());
     }
 
@@ -147,6 +153,9 @@ public class MessagePublisherService {
                 request.getHeaders().forEach(props::setHeader);
             }
             props.setHeader(HEADER_SCENARIO_ID, scenario.getId());
+            if (request.isSimulateFailure()) {
+                props.setHeader(HEADER_SIMULATE_REJECT, true);
+            }
             return message;
         };
 

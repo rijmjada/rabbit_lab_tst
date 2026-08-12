@@ -66,6 +66,14 @@ public class MessageEventDto {
     }
 
     public static MessageEventDto delivered(String scenarioId, String messageId, String queueName, String queueLabel) {
+        return delivered(scenarioId, messageId, queueName, queueLabel, null);
+    }
+
+    /**
+     * @param deathReason si esta entrega es la redirección real de un mensaje rechazado por otra cola
+     *                     (dead-letter), el motivo tomado del header `x-death` de RabbitMQ; null en el caso normal.
+     */
+    public static MessageEventDto delivered(String scenarioId, String messageId, String queueName, String queueLabel, String deathReason) {
         return MessageEventDto.builder()
                 .type(EventType.MESSAGE_DELIVERED)
                 .scenarioId(scenarioId)
@@ -73,6 +81,7 @@ public class MessageEventDto {
                 .timestamp(Instant.now().toEpochMilli())
                 .queueName(queueName)
                 .queueLabel(queueLabel)
+                .reason(deathReason)
                 .build();
     }
 
@@ -84,6 +93,19 @@ public class MessageEventDto {
                 .timestamp(Instant.now().toEpochMilli())
                 .queueName(queueName)
                 .queueLabel(queueLabel)
+                .build();
+    }
+
+    /** El consumidor de {@code queueName} rechazó el mensaje (basic.nack sin requeue); RabbitMQ lo reenviará solo al dead letter exchange configurado, si hay uno. */
+    public static MessageEventDto rejected(String scenarioId, String messageId, String queueName, String queueLabel, String reason) {
+        return MessageEventDto.builder()
+                .type(EventType.MESSAGE_REJECTED)
+                .scenarioId(scenarioId)
+                .messageId(messageId)
+                .timestamp(Instant.now().toEpochMilli())
+                .queueName(queueName)
+                .queueLabel(queueLabel)
+                .reason(reason)
                 .build();
     }
 

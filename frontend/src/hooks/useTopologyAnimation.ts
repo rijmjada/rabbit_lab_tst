@@ -6,7 +6,7 @@ export type QueueVisualState = {
   name: string;
   label: string;
   matchState: "idle" | "matched" | "unmatched";
-  deliveryState: "idle" | "delivered" | "acked";
+  deliveryState: "idle" | "delivered" | "acked" | "rejected";
   flowTick: number;
   rejectTick: number;
   deliverTick: number;
