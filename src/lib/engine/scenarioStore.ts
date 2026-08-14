@@ -55,21 +55,38 @@ export function deleteScenario(id: string): void {
   clearHistory(id);
 }
 
-/** Igual que `ScenarioService.updateBindings`: nunca toca `name`/`label`/`boundExchange` — esos son la topología fija desde la creación. */
+/**
+ * Igual que `ScenarioService.updateBindings`: nunca toca `name`/`label`/`boundExchange` — esos son la topología fija desde la creación.
+ *
+ * Construye objetos nuevos (cola por cola, y el `Scenario` que las contiene) en vez de mutar los existentes in-place:
+ * React decide si re-renderizar comparando la referencia que devuelve `setScenario(...)` (`useScenario.ts`) contra la
+ * anterior — si fuera el mismo objeto mutado, el bailout de `Object.is` haría que la UI (el diagrama, el label de
+ * binding de cada cola) se quedara mostrando el valor viejo, aunque el motor ya esté usando el valor nuevo para
+ * publicar (porque `publish()` lee el escenario directo del store, no del estado de React).
+ */
 export function updateBindings(id: string, updates: QueueConfig[], bridgeBindingKey: string | undefined): Scenario {
   const scenario = getScenario(id);
-  const byName = new Map(scenario.queues.map((q) => [q.name, q]));
+  const updateByName = new Map(updates.map((u) => [u.name, u]));
 
-  for (const update of updates) {
-    const existing = byName.get(update.name);
-    if (!existing) continue;
-    existing.bindingKey = update.bindingKey ?? null;
-    existing.pattern = update.pattern ?? null;
-    existing.headers = update.headers ?? null;
-    existing.xMatch = update.xMatch ?? null;
-    if (update.ackMode != null) existing.ackMode = update.ackMode;
-  }
-  if (bridgeBindingKey != null) scenario.bridgeBindingKey = bridgeBindingKey;
+  const queues = scenario.queues.map((q) => {
+    const update = updateByName.get(q.name);
+    if (!update) return q;
+    return {
+      ...q,
+      bindingKey: update.bindingKey ?? null,
+      pattern: update.pattern ?? null,
+      headers: update.headers ?? null,
+      xMatch: update.xMatch ?? null,
+      ackMode: update.ackMode ?? q.ackMode,
+    };
+  });
 
-  return scenario;
+  const updated: Scenario = {
+    ...scenario,
+    queues,
+    bridgeBindingKey: bridgeBindingKey ?? scenario.bridgeBindingKey,
+  };
+
+  scenarios.set(id, updated);
+  return updated;
 }
